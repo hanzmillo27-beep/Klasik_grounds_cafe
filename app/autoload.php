@@ -6,7 +6,7 @@ spl_autoload_register(function (string $class): void {
         'Core\\'        => __DIR__ . '/Core/',
         'Models\\'      => __DIR__ . '/Models/',
         'Controllers\\' => __DIR__ . '/Controllers/',
-        'Api\\'         => __DIR__ . '/Api/',
+        'Api\\'         => __DIR__ . '/api/',
     ];
 
     foreach ($prefixes as $prefix => $directory) {

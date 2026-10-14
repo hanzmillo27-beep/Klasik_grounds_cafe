@@ -24,7 +24,8 @@ class Router
             $folder = ucfirst($parts[0]);
             $resource = $parts[1] ?? null;
 
-            $folderPath = dirname(__DIR__) . '/' . $folder;
+            $folderDirectory = strtolower($folder) === 'api' ? 'api' : $folder;
+            $folderPath = dirname(__DIR__) . '/' . $folderDirectory;
 
             if (is_dir($folderPath) && $resource) {
                 $controllerName =
