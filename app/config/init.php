@@ -25,7 +25,6 @@ if ($configuredBaseUrl !== '') {
 
     define('BASE_URL', $scheme . '://' . $host . $basePath);
 }
-=======
 define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST']);
 
 
