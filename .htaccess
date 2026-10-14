@@ -1,0 +1,11 @@
+#route to public folder
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{DOCUMENT_ROOT}/sample/public/$1 -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/sample/public/$1 -d
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    RewriteRule ^ public/index.php [L]
+</IfModule>

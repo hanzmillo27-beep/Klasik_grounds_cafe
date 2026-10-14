@@ -1,0 +1,163 @@
+:root {
+    --cafe-cream: #f7f2e9;
+    --cafe-beige: #eee3d1;
+    --cafe-brown: #76543b;
+    --cafe-brown-dark: #4b3526;
+    --cafe-brown-light: #a77a54;
+    --cafe-ink: #3f352c;
+}
+
+body,
+.content-wrapper {
+    background-color: var(--cafe-cream);
+    color: var(--cafe-ink);
+}
+
+body.login-page {
+    background-color: var(--cafe-cream);
+}
+
+.login-box .card {
+    background-color: #fffdf9;
+    border: 1px solid #e5d8c7;
+}
+
+.content-header h1 {
+    color: var(--cafe-brown-dark);
+}
+
+.main-header.navbar {
+    background-color: #fffdf9;
+    border-bottom: 1px solid var(--cafe-beige);
+}
+
+.main-header .nav-link,
+.main-header .navbar-nav .nav-link {
+    color: var(--cafe-brown-dark);
+}
+
+.main-sidebar.sidebar-dark-primary {
+    background-color: var(--cafe-brown-dark);
+}
+
+.sidebar-dark-primary .brand-link {
+    background-color: #3e2b20;
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+    color: #fff9ef;
+}
+
+.cafe-brand-logo {
+    width: 28px;
+    height: 28px;
+    margin-right: 0.4rem;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+}
+
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link {
+    color: #eadbca;
+}
+
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fffdf9;
+}
+
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active,
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active:hover {
+    background-color: var(--cafe-brown-light);
+    color: #fff;
+}
+
+.card {
+    border-color: #e5d8c7;
+}
+
+.card-primary.card-outline {
+    border-top-color: var(--cafe-brown);
+}
+
+.card-header,
+.modal-header {
+    background-color: #fbf8f2;
+    border-bottom-color: #e5d8c7;
+}
+
+.card-title,
+.modal-title {
+    color: var(--cafe-brown-dark);
+}
+
+.btn-primary,
+.btn-info,
+.bg-primary,
+.bg-info,
+.badge-primary,
+.badge-info,
+.page-item.active .page-link,
+.dropdown-item.active,
+.dropdown-item:active,
+.progress-bar {
+    background-color: var(--cafe-brown) !important;
+    border-color: var(--cafe-brown) !important;
+    color: #fff !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-info:hover,
+.btn-info:focus {
+    background-color: var(--cafe-brown-dark) !important;
+    border-color: var(--cafe-brown-dark) !important;
+}
+
+.btn-outline-primary,
+.btn-outline-info {
+    border-color: var(--cafe-brown);
+    color: var(--cafe-brown);
+}
+
+.btn-outline-primary:hover,
+.btn-outline-info:hover {
+    background-color: var(--cafe-brown);
+    border-color: var(--cafe-brown);
+    color: #fff;
+}
+
+a,
+.page-link {
+    color: var(--cafe-brown);
+}
+
+a:hover,
+.page-link:hover {
+    color: var(--cafe-brown-dark);
+}
+
+.form-control:focus,
+.custom-select:focus {
+    border-color: var(--cafe-brown-light);
+    box-shadow: 0 0 0 0.2rem rgba(118, 84, 59, 0.18);
+}
+
+.table thead th {
+    background-color: #f2e8d9;
+    border-bottom-color: #dfd0bc;
+    color: var(--cafe-brown-dark);
+}
+
+.table-hover tbody tr:hover {
+    background-color: #fbf7ef;
+}
+
+.alert-info {
+    background-color: #f2e8d9;
+    border-color: #dfd0bc;
+    color: var(--cafe-brown-dark);
+}
+
+.weekly-profit-chart-wrap {
+    position: relative;
+    height: 320px;
+}
