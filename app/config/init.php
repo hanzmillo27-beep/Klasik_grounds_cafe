@@ -6,7 +6,7 @@ define('BASE_PATH', dirname(__DIR__));
 define('PUBLIC_PATH', BASE_PATH . '/public');
 
 
-define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/sample');
+define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST']);
 
 define('DB_PORT', '6543');
 define('DB_HOST', 'aws-0-ap-northeast-2.pooler.supabase.com');
