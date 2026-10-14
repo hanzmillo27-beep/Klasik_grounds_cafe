@@ -7,9 +7,11 @@ class Router
     public function dispatch(): void
     {
         $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-        $base = parse_url(BASE_URL, PHP_URL_PATH);
+        $base = parse_url(BASE_URL, PHP_URL_PATH) ?? '';
 
-        $uri = str_replace($base, '', $uri);
+        if ($base !== '' && ($uri === $base || str_starts_with($uri, $base . '/'))) {
+            $uri = substr($uri, strlen($base));
+        }
         $uri = trim($uri, '/');
 
         $parts = $uri ? explode('/', $uri) : [];

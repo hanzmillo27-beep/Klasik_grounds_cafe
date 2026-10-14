@@ -162,7 +162,7 @@ $pageScript = $title ?? 'Dashboard';
 $pageScriptPath = PUBLIC_PATH . '/js/' . $pageScript . '.js';
 $pageScriptVersion = is_file($pageScriptPath) ? filemtime($pageScriptPath) : 1;
 ?>
-<script src="<?= BASE_URL ?>/public/js/<?= rawurlencode($pageScript) ?>.js?v=<?= $pageScriptVersion ?>"></script>
+<script src="<?= BASE_URL ?>/js/<?= rawurlencode($pageScript) ?>.js?v=<?= $pageScriptVersion ?>"></script>
 
 </body>
 </html>
