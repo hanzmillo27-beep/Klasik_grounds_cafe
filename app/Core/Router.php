@@ -9,9 +9,13 @@ class Router
         $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $base = parse_url(BASE_URL, PHP_URL_PATH) ?? '';
 
+<<<<<<< HEAD
         if ($base !== '' && ($uri === $base || str_starts_with($uri, $base . '/'))) {
             $uri = substr($uri, strlen($base));
         }
+=======
+        $uri = str_replace($base ?? '', '', $uri);
+>>>>>>> c9c5fc7d3188581370fcedfce014cc97604c9de1
         $uri = trim($uri, '/');
 
         $parts = $uri ? explode('/', $uri) : [];

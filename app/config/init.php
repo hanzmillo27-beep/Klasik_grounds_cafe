@@ -6,6 +6,7 @@ define('BASE_PATH', dirname(__DIR__));
 define('PUBLIC_PATH', BASE_PATH . '/public');
 
 
+<<<<<<< HEAD
 $configuredBaseUrl = trim((string) getenv('APP_BASE_URL'));
 if ($configuredBaseUrl !== '') {
     define('BASE_URL', rtrim($configuredBaseUrl, '/'));
@@ -25,6 +26,9 @@ if ($configuredBaseUrl !== '') {
 
     define('BASE_URL', $scheme . '://' . $host . $basePath);
 }
+=======
+define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST']);
+>>>>>>> c9c5fc7d3188581370fcedfce014cc97604c9de1
 
 define('DB_PORT', '6543');
 define('DB_HOST', 'aws-0-ap-northeast-2.pooler.supabase.com');
