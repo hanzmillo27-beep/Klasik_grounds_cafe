@@ -9,7 +9,7 @@ class Router
         $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $base = parse_url(BASE_URL, PHP_URL_PATH);
 
-        $uri = str_replace($base, '', $uri);
+        $uri = str_replace($base ?? '', '', $uri);
         $uri = trim($uri, '/');
 
         $parts = $uri ? explode('/', $uri) : [];
