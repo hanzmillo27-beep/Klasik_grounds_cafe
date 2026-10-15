@@ -26,7 +26,7 @@
           href="<?= BASE_URL ?>/css/cafe-theme.css">
 </head>
 
-<body class="cafe-auth-page">
+<body class="kg-landing-page">
 
     <?= $content ?>
 
