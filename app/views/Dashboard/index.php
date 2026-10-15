@@ -1,11 +1,11 @@
-<div class="container-fluid dashboard-page">
+<div class="container-fluid">
 
     <div class="row">
         <div class="col-12">
             <div class="card card-primary card-outline">
-                <div class="card-header">
+                <div class="card-header d-flex flex-wrap align-items-center">
                     <h3 class="card-title">Weekly Net Profit</h3>
-                    <div class="card-tools text-muted">
+                    <div class="card-tools ml-auto mt-2 mt-sm-0 text-muted">
                         <?= date('M d', strtotime('monday this week')) ?>
                         – <?= date('M d, Y') ?>
                     </div>
@@ -27,7 +27,7 @@
 
     <div class="row">
 
-        <div class="col-lg-4 col-md-6">
+        <div class="col-12 col-md-6 col-lg-4">
 
             <div class="small-box bg-primary">
 
@@ -55,7 +55,7 @@
         </div>
 
 
-        <div class="col-lg-4 col-md-6">
+        <div class="col-12 col-md-6 col-lg-4">
 
             <div class="small-box bg-info">
 
@@ -83,7 +83,7 @@
         </div>
 
 
-        <div class="col-lg-4 col-md-6">
+        <div class="col-12 col-md-6 col-lg-4">
 
             <div class="small-box bg-success">
 
@@ -115,7 +115,7 @@
 
     <div class="row">
 
-        <div class="col-lg-6 col-md-6">
+        <div class="col-12 col-md-6">
 
             <div class="small-box bg-secondary">
 
@@ -140,7 +140,7 @@
         </div>
 
 
-        <div class="col-lg-6 col-md-6">
+        <div class="col-12 col-md-6">
 
             <div class="small-box bg-warning">
 
@@ -169,17 +169,17 @@
 
     <div class="row">
 
-        <div class="col-lg-5">
+        <div class="col-12 col-lg-5">
 
             <div class="card card-primary card-outline">
 
-                <div class="card-header">
+                <div class="card-header d-flex flex-wrap align-items-center">
 
                     <h3 class="card-title">
                         Recent Daily Expenses
                     </h3>
 
-                    <div class="card-tools">
+                    <div class="card-tools ml-auto mt-2 mt-sm-0">
 
                         <a
                             href="<?= BASE_URL ?>/DailyExpenses"
@@ -281,17 +281,17 @@
         </div>
 
 
-        <div class="col-lg-7">
+        <div class="col-12 col-lg-7">
 
             <div class="card card-primary card-outline">
 
-                <div class="card-header">
+                <div class="card-header d-flex flex-wrap align-items-center">
 
                     <h3 class="card-title">
                         Inventory Status
                     </h3>
 
-                    <div class="card-tools">
+                    <div class="card-tools ml-auto mt-2 mt-sm-0">
 
                         <a
                             href="<?= BASE_URL ?>/Inventory"

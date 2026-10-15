@@ -72,6 +72,10 @@ $(document).ready(function () {
 
         table = $('#products-table').DataTable({
 
+            responsive: true,
+
+            autoWidth: false,
+
             destroy: true,
 
             processing: true,

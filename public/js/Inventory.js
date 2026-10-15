@@ -7,6 +7,10 @@ $(document).ready(function () {
 
         table = $('#inventory-table').DataTable({
 
+            responsive: true,
+
+            autoWidth: false,
+
             destroy: true,
 
             processing: true,

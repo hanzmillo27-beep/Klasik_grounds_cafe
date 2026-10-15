@@ -1,12 +1,12 @@
 <div class="card card-primary card-outline">
 
-    <div class="card-header">
+    <div class="card-header d-flex flex-wrap align-items-center">
 
         <h3 class="card-title">
             Daily Expenses
         </h3>
 
-        <div class="card-tools">
+        <div class="card-tools ml-auto mt-2 mt-sm-0">
 
             <button
                 type="button"
@@ -103,10 +103,11 @@
         </div>
 
 
-        <table
-            id="expense-table"
-            class="table table-bordered table-striped table-hover w-100"
-        >
+        <div class="table-responsive">
+            <table
+                id="expense-table"
+                class="table table-bordered table-striped table-hover w-100"
+            >
 
             <thead>
 
@@ -119,7 +120,8 @@
 
             </thead>
 
-        </table>
+            </table>
+        </div>
 
     </div>
 
@@ -132,7 +134,7 @@
     tabindex="-1"
 >
 
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
 
         <form
             id="expense-form"

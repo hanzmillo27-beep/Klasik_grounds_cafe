@@ -1,12 +1,12 @@
 <div class="card card-primary card-outline">
 
-    <div class="card-header">
+    <div class="card-header d-flex flex-wrap align-items-center">
 
         <h3 class="card-title">
             Inventory Management
         </h3>
 
-        <div class="card-tools">
+        <div class="card-tools ml-auto mt-2 mt-sm-0">
 
             <button
                 type="button"
@@ -23,10 +23,11 @@
 
     <div class="card-body">
 
-        <table
-            id="inventory-table"
-            class="table table-bordered table-striped table-hover w-100"
-        >
+        <div class="table-responsive">
+            <table
+                id="inventory-table"
+                class="table table-bordered table-striped table-hover w-100"
+            >
 
             <thead>
 
@@ -39,14 +40,15 @@
 
             </thead>
 
-        </table>
+            </table>
+        </div>
 
     </div>
 
 </div>
 
 <div class="modal fade" id="restock-modal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
         <form id="restock-form" class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Replenish Stock</h5>
@@ -99,7 +101,7 @@
     tabindex="-1"
 >
 
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
 
         <form
             id="inventory-form"

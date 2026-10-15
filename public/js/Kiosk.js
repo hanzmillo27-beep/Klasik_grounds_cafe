@@ -94,7 +94,7 @@ $(document).ready(function () {
                             ${escapeHtml(item.product_name)}
                         </div>
                         <div>${money(item.product_price)} each</div>
-                        <div class="d-flex align-items-center mt-2">
+                        <div class="d-flex flex-wrap align-items-center mt-2">
                             <button type="button"
                                 class="btn btn-outline-secondary kiosk-minus"
                                 data-id="${item.product_id}">−</button>

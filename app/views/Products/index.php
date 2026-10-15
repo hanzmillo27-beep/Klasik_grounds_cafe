@@ -1,12 +1,12 @@
 <div class="card card-primary card-outline">
 
-    <div class="card-header">
+    <div class="card-header d-flex flex-wrap align-items-center">
 
         <h3 class="card-title">
             Product Management
         </h3>
 
-        <div class="card-tools">
+        <div class="card-tools ml-auto mt-2 mt-sm-0">
 
             <button
                 type="button"
@@ -23,10 +23,11 @@
 
     <div class="card-body">
 
-        <table
-            id="products-table"
-            class="table table-bordered table-striped table-hover w-100"
-        >
+        <div class="table-responsive">
+            <table
+                id="products-table"
+                class="table table-bordered table-striped table-hover w-100"
+            >
 
             <thead>
 
@@ -40,7 +41,8 @@
 
             </thead>
 
-        </table>
+            </table>
+        </div>
 
     </div>
 
@@ -53,7 +55,7 @@
     tabindex="-1"
 >
 
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
 
         <form
             id="products-form"
@@ -107,7 +109,7 @@
                     <input type="file" name="product_image" id="product_image"
                         class="form-control-file" accept="image/jpeg,image/png,image/webp">
                     <small class="form-text text-muted">JPG, PNG, or WebP; maximum 5 MB.</small>
-                    <img id="product-image-preview" class="mt-2 d-none"
+                    <img id="product-image-preview" class="img-fluid mt-2 d-none"
                         alt="Product photo preview" style="max-width: 180px; max-height: 140px; object-fit: cover;">
                     <div id="product-image-current" class="small text-muted mt-2"></div>
                 </div>

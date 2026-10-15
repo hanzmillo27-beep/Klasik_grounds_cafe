@@ -1,7 +1,7 @@
 <div class="card card-primary card-outline">
-    <div class="card-header">
+    <div class="card-header d-flex flex-wrap align-items-center">
         <h3 class="card-title">Category Management</h3>
-        <div class="card-tools">
+        <div class="card-tools ml-auto mt-2 mt-sm-0">
             <button type="button" class="btn btn-primary btn-sm" id="btnNew">
                 <i class="fas fa-plus"></i> New Category
             </button>
@@ -9,19 +9,21 @@
     </div>
 
     <div class="card-body">
-        <table id="categories-table" class="table table-bordered table-striped table-hover w-100">
+        <div class="table-responsive">
+            <table id="categories-table" class="table table-bordered table-striped table-hover w-100">
             <thead>
                 <tr>
                     <th>Category Name</th>
                     <th class="text-center">Option</th>
                 </tr>
             </thead>
-        </table>
+            </table>
+        </div>
     </div>
 </div>
 
 <div class="modal fade" id="category-modal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
         <form id="categories-form" class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modal-title">Add Category</h5>

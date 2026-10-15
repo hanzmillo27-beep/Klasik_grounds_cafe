@@ -1,7 +1,7 @@
 <div class="row justify-content-center">
-    <div class="col-lg-9">
+    <div class="col-12 col-lg-9">
         <div class="card card-primary card-outline">
-            <div class="card-header">
+            <div class="card-header d-flex flex-wrap align-items-center">
                 <h3 class="card-title">Your Cafe Rewards</h3>
             </div>
             <div class="card-body">
@@ -41,7 +41,7 @@
         </div>
 
         <div class="card">
-            <div class="card-header"><h3 class="card-title">Recent Activity</h3></div>
+            <div class="card-header d-flex flex-wrap align-items-center"><h3 class="card-title">Recent Activity</h3></div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-striped mb-0">

@@ -1,4 +1,4 @@
-<div class="container-fluid py-4">
+<div class="container-fluid py-4 px-2 px-md-3">
     <div class="text-center mb-4">
         <h1 class="font-weight-bold">Klasik Grounds Café</h1>
         <p class="text-muted">Order here and pay at the cashier.</p>
@@ -14,7 +14,7 @@
     <div id="kiosk-message"></div>
 
     <div id="kiosk-confirmation" class="d-none text-center py-5">
-        <div class="card mx-auto" style="max-width: 600px;">
+        <div class="card w-100 mx-auto" style="max-width: 600px;">
             <div class="card-body p-5">
                 <h2 class="font-weight-bold">Order Submitted</h2>
                 <p class="text-muted">Show this reference number to the cashier.</p>
@@ -31,7 +31,7 @@
     </div>
 
     <div id="kiosk-ordering" class="row">
-        <div class="col-lg-8">
+        <div class="col-12 col-lg-8 mb-4 mb-lg-0">
             <input type="text" id="kiosk-search"
                    class="form-control form-control-lg mb-3"
                    placeholder="Search menu...">
@@ -41,9 +41,9 @@
             </div>
         </div>
 
-        <div class="col-lg-4">
+        <div class="col-12 col-lg-4">
             <div class="card card-primary card-outline">
-                <div class="card-header">
+                <div class="card-header d-flex flex-wrap align-items-center">
                     <h3 class="card-title">Your Order</h3>
                 </div>
 
@@ -64,14 +64,14 @@
                     </div>
                 </div>
 
-                <div class="card-footer">
+                <div class="card-footer d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center">
                     <button type="button" id="kiosk-clear"
-                            class="btn btn-outline-danger">
+                            class="btn btn-outline-danger mb-2 mb-sm-0">
                         Clear
                     </button>
 
                     <button type="button" id="kiosk-submit"
-                            class="btn btn-success float-right">
+                            class="btn btn-success ml-sm-auto">
                         Submit Order
                     </button>
                 </div>

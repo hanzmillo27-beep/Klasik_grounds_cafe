@@ -21,6 +21,10 @@ $(document).ready(function () {
 
         table = $('#expense-table').DataTable({
 
+            responsive: true,
+
+            autoWidth: false,
+
             destroy: true,
 
             processing: true,

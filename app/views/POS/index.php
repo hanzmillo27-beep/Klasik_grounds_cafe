@@ -1,10 +1,10 @@
 <div class="row">
 
-    <div class="col-lg-8">
+    <div class="col-12 col-lg-8 mb-4 mb-lg-0">
 
         <div class="card card-primary card-outline">
 
-            <div class="card-header">
+            <div class="card-header d-flex flex-wrap align-items-center">
 
                 <h3 class="card-title">
                     Point of Sale
@@ -36,11 +36,11 @@
 
     </div>
 
-    <div class="col-lg-4">
+    <div class="col-12 col-lg-4">
 
         <div class="card card-primary card-outline">
 
-            <div class="card-header">
+            <div class="card-header d-flex flex-wrap align-items-center">
 
                 <h3 class="card-title">
                     Current Sale
@@ -109,11 +109,11 @@
 
             </div>
 
-            <div class="card-footer">
+            <div class="card-footer d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center">
 
                 <button
                     type="button"
-                    class="btn btn-danger"
+                    class="btn btn-danger mb-2 mb-sm-0"
                     id="btnClear"
                 >
                     <i class="fas fa-trash"></i>
@@ -122,7 +122,7 @@
 
                 <button
                     type="button"
-                    class="btn btn-success float-right"
+                    class="btn btn-success ml-sm-auto"
                     id="btnCheckout"
                 >
                     <i class="fas fa-cash-register"></i>
@@ -139,9 +139,9 @@
 
 <div class="card mt-4">
     <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold">
-                <i class="bi bi-receipt me-2"></i>
+        <div class="d-flex flex-wrap justify-content-between align-items-center">
+            <h5 class="mb-0 font-weight-bold">
+                <i class="bi bi-receipt mr-2"></i>
                 Transaction History
             </h5>
 
@@ -150,7 +150,7 @@
                 class="btn btn-outline-primary btn-sm"
                 id="btn-refresh-transactions"
             >
-                <i class="bi bi-arrow-clockwise me-1"></i>
+                <i class="bi bi-arrow-clockwise mr-1"></i>
                 Refresh
             </button>
         </div>
@@ -167,7 +167,7 @@
                         <th>Date</th>
                         <th>Items</th>
                         <th>Total</th>
-                        <th class="text-end">Option</th>
+                        <th class="text-right">Option</th>
                     </tr>
                 </thead>
 
@@ -189,20 +189,20 @@
     tabindex="-1"
     aria-hidden="true"
 >
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
 
             <div class="modal-header">
-                <h5 class="modal-title fw-bold">
+                <h5 class="modal-title font-weight-bold">
                     Transaction Details
                 </h5>
 
                 <button
                     type="button"
-                    class="btn-close"
+                    class="close"
                     data-dismiss="modal"
                     aria-label="Close"
-                ></button>
+                ><span aria-hidden="true">&times;</span></button>
             </div>
 
             <div class="modal-body" id="transaction-details">

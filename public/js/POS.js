@@ -166,7 +166,7 @@ $(document).ready(function () {
                         <div class="card h-100 product-card">
                             ${product.product_image_url ? `<img src="${escapeHtml(product.product_image_url)}" alt="${escapeHtml(product.product_name)}" class="card-img-top" style="height:150px;object-fit:cover;">` : ''}
                             <div class="card-body">
-                                <h6 class="fw-bold mb-1">
+                                <h6 class="font-weight-bold mb-1">
                                     ${escapeHtml(product.product_name)}
                                 </h6>
 
@@ -176,7 +176,7 @@ $(document).ready(function () {
                                     )}
                                 </div>
 
-                                <div class="fw-bold mb-3">
+                                <div class="font-weight-bold mb-3">
                                     ${formatMoney(product.product_price)}
                                 </div>
 
@@ -185,7 +185,7 @@ $(document).ready(function () {
                                     class="btn btn-primary btn-sm w-100 btn-add-product"
                                     data-id="${product.product_id}"
                                 >
-                                    <i class="fa fa-cart-plus me-1"></i>
+                                    <i class="fa fa-cart-plus mr-1"></i>
                                     Add
                                 </button>
                             </div>
@@ -264,10 +264,10 @@ $(document).ready(function () {
             $(s.cartList).html(
                 cart.map((item) => `
                     <div class="border rounded p-3 mb-2">
-                        <div class="d-flex justify-content-between gap-3">
+                        <div class="d-flex flex-wrap justify-content-between">
 
                             <div>
-                                <div class="fw-bold">
+                                <div class="font-weight-bold">
                                     ${escapeHtml(item.product_name)}
                                 </div>
 
@@ -276,8 +276,8 @@ $(document).ready(function () {
                                 </div>
                             </div>
 
-                            <div class="text-end">
-                                <div class="fw-bold">
+                            <div class="text-right ml-3">
+                                <div class="font-weight-bold">
                                     ${formatMoney(
                                         item.product_price *
                                         item.quantity
@@ -611,7 +611,7 @@ $(document).ready(function () {
                 transactions.map((transaction) => `
                     <tr>
 
-                        <td class="fw-bold">
+                        <td class="font-weight-bold">
                             #${transaction.sale_id}
                         </td>
 
@@ -637,17 +637,17 @@ $(document).ready(function () {
                             ${transaction.item_count || 0}
                         </td>
 
-                        <td class="fw-bold">
+                        <td class="font-weight-bold">
                             ${formatMoney(transaction.total_amount)}
                         </td>
 
-                        <td class="text-end">
+                        <td class="text-right">
                             <button
                                 type="button"
                                 class="btn btn-primary btn-sm btn-view-transaction"
                                 data-id="${transaction.sale_id}"
                             >
-                                <i class="fa fa-eye me-1"></i>
+                                <i class="fa fa-eye mr-1"></i>
                                 View Details
                             </button>
                         </td>
@@ -719,17 +719,17 @@ $(document).ready(function () {
                             Transaction #
                         </div>
 
-                        <div class="fw-bold fs-5">
+                        <div class="font-weight-bold h5">
                             #${sale.sale_id}
                         </div>
                     </div>
 
-                    <div class="col-md-6 text-md-end">
+                    <div class="col-md-6 text-md-right">
                         <div class="small text-muted">
                             Date
                         </div>
 
-                        <div class="fw-bold">
+                        <div class="font-weight-bold">
                             ${formatDate(sale.sale_date)}
                         </div>
                     </div>
@@ -739,7 +739,7 @@ $(document).ready(function () {
                             Customer
                         </div>
 
-                        <div class="fw-bold">
+                        <div class="font-weight-bold">
                             ${escapeHtml(
                                 sale.customer_name ||
                                 'Walk-in Customer'
@@ -747,12 +747,12 @@ $(document).ready(function () {
                         </div>
                     </div>
 
-                    <div class="col-md-6 mt-3 text-md-end">
+                    <div class="col-md-6 mt-3 text-md-right">
                         <div class="small text-muted">
                             Cashier
                         </div>
 
-                        <div class="fw-bold">
+                        <div class="font-weight-bold">
                             ${escapeHtml(
                                 sale.user_name ||
                                 'Unknown'
@@ -769,8 +769,8 @@ $(document).ready(function () {
                             <tr>
                                 <th>Product</th>
                                 <th class="text-center">Qty</th>
-                                <th class="text-end">Unit Price</th>
-                                <th class="text-end">Subtotal</th>
+                                <th class="text-right">Unit Price</th>
+                                <th class="text-right">Subtotal</th>
                             </tr>
                         </thead>
 
@@ -791,13 +791,13 @@ $(document).ready(function () {
                                                 ${item.quantity}
                                             </td>
 
-                                            <td class="text-end">
+                                            <td class="text-right">
                                                 ${formatMoney(
                                                     item.unit_price
                                                 )}
                                             </td>
 
-                                            <td class="text-end">
+                                            <td class="text-right">
                                                 ${formatMoney(
                                                     item.subtotal
                                                 )}
@@ -822,12 +822,12 @@ $(document).ready(function () {
                             <tr>
                                 <th
                                     colspan="3"
-                                    class="text-end"
+                                    class="text-right"
                                 >
                                     Grand Total
                                 </th>
 
-                                <th class="text-end fs-5">
+                                <th class="text-right h5">
                                     ${formatMoney(sale.total_amount)}
                                 </th>
                             </tr>

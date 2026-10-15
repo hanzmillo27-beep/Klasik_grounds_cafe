@@ -177,9 +177,6 @@ a:hover,
 }
 
 .kg-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     min-height: 3.5rem;
     padding: 0 7%;
     border-bottom: 1px solid #242424;
@@ -194,12 +191,6 @@ a:hover,
 }
 
 .kg-wordmark:hover { color: #fff; text-decoration: none; }
-
-.kg-nav {
-    display: flex;
-    align-items: center;
-    gap: 1.6rem;
-}
 
 .kg-nav a {
     color: #b9b9b9;
@@ -218,10 +209,7 @@ a:hover,
 
 .kg-hero {
     position: relative;
-    display: flex;
     min-height: 49rem;
-    align-items: center;
-    justify-content: center;
     padding: 5rem 1.5rem;
     background-image: linear-gradient(rgba(3, 3, 3, 0.78), rgba(3, 3, 3, 0.88)), url('../dist/img/background.png');
     background-position: center;
@@ -285,9 +273,6 @@ a:hover,
 }
 
 .kg-hero-actions {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
     margin-top: 2rem;
 }
 
@@ -310,22 +295,19 @@ a:hover,
 .kg-button-outline:hover { border-color: #aaa; color: #fff; }
 
 .kg-values {
-    display: flex;
-    justify-content: center;
     padding: 2.1rem 1.5rem;
     border-top: 1px solid #242424;
     border-bottom: 1px solid #242424;
     background: #0b0b0d;
 }
 
-.kg-values > div {
-    min-width: 12rem;
+.kg-values .row > div {
     padding: 0 2.3rem;
     border-right: 1px solid #454545;
     text-align: center;
 }
 
-.kg-values > div:last-child { border-right: 0; }
+.kg-values .row > div:last-child { border-right: 0; }
 .kg-values strong { display: block; color: #f7f7f7; font-size: 1.8rem; line-height: 1; }
 .kg-values span { display: block; margin-top: 0.45rem; color: #929292; font-size: 0.85rem; }
 
@@ -334,31 +316,7 @@ a:hover,
 .kg-section-heading h2, .kg-login-intro h2 { margin: 0; color: #fff; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.03em; }
 .kg-section-heading > p:last-child, .kg-login-intro > p:last-child { margin: 0.75rem 0 0; color: #989898; font-size: 1rem; }
 
-.kg-steps {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.2rem;
-    max-width: 60rem;
-    margin: 0 auto;
-}
-
-.kg-step {
-    min-height: 12rem;
-    padding: 1.5rem;
-    border: 1px solid #29292c;
-    border-radius: 1rem;
-    background: #18181b;
-}
-
-.kg-step > strong { display: block; color: #705b22; font-size: 1.8rem; line-height: 1; }
-.kg-step h3 { margin: 1rem 0 0.65rem; color: #f5f5f5; font-size: 1rem; }
-.kg-step p { margin: 0; color: #a0a0a5; font-size: 0.9rem; line-height: 1.55; }
-
 .kg-login-section {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
-    align-items: center;
-    gap: 5rem;
     padding: 5rem 15%;
     border-top: 1px solid #1e1e1e;
     background: #0b0b0d;
@@ -368,6 +326,8 @@ a:hover,
 .kg-login-intro > p:last-child { max-width: 26rem; line-height: 1.6; }
 
 .kg-login-card {
+    width: 100%;
+    max-width: 26rem;
     padding: 2rem;
     border: 1px solid #2b2b2e;
     border-radius: 1rem;
@@ -401,7 +361,7 @@ a:hover,
 .kg-footer-copy { margin: 2rem 0 0; color: #5f5f64; font-size: 0.78rem; }
 
 @media (max-width: 900px) {
-    .kg-login-section { grid-template-columns: 1fr; gap: 2.5rem; padding: 4.5rem 8%; }
+    .kg-login-section { padding: 4.5rem 8%; }
     .kg-login-intro { text-align: center; }
     .kg-login-intro h2, .kg-login-intro > p:last-child { margin-right: auto; margin-left: auto; }
 }
@@ -412,85 +372,15 @@ a:hover,
     .kg-nav a:not(.kg-nav-button) { display: none; }
     .kg-hero { min-height: 42rem; padding: 4rem 1.2rem; }
     .kg-hero-logo { width: 7.5rem; height: 7.5rem; }
-    .kg-values { flex-wrap: wrap; gap: 1.4rem 0; }
-    .kg-values > div { min-width: 33.33%; padding: 0 0.7rem; }
+    .kg-values .row > div { padding: 0.6rem 0.7rem; border-right: 0; }
     .kg-values strong { font-size: 1.35rem; }
-    .kg-steps { grid-template-columns: 1fr 1fr; }
-    .kg-section { padding: 4.5rem 1.2rem; }
 }
 
 @media (max-width: 460px) {
     .kg-wordmark { font-size: 1rem; }
     .kg-hero h1 { font-size: 2.4rem; }
-    .kg-hero-actions { flex-direction: column; align-items: stretch; max-width: 15rem; margin-right: auto; margin-left: auto; }
-    .kg-values > div { min-width: 100%; border-right: 0; }
-    .kg-steps { grid-template-columns: 1fr; }
+    .kg-hero-actions { max-width: 15rem; margin-right: auto; margin-left: auto; }
+    .kg-values .row > div { border-right: 0; }
     .kg-login-section { padding-right: 1.2rem; padding-left: 1.2rem; }
     .kg-login-card { padding: 1.4rem; }
-}
-
-@media (max-width: 576px) {
-    .dashboard-page {
-        padding-right: 0.5rem;
-        padding-left: 0.5rem;
-    }
-
-    .dashboard-page .row {
-        margin-right: -0.35rem;
-        margin-left: -0.35rem;
-    }
-
-    .dashboard-page [class*="col-"] {
-        padding-right: 0.35rem;
-        padding-left: 0.35rem;
-    }
-
-    .dashboard-page .card {
-        margin-bottom: 0.75rem;
-    }
-
-    .dashboard-page .card-header {
-        padding: 0.65rem 0.8rem;
-    }
-
-    .dashboard-page .card-title,
-    .dashboard-page .card-tools {
-        font-size: 0.8rem;
-    }
-
-    .dashboard-page .card-body {
-        padding: 0.75rem;
-    }
-
-    .dashboard-page .weekly-profit-chart-wrap {
-        height: 180px;
-    }
-
-    .dashboard-page .small-box {
-        min-height: 78px;
-        margin-bottom: 0.75rem;
-        border-radius: 0.25rem;
-    }
-
-    .dashboard-page .small-box .inner {
-        padding: 0.8rem 0.9rem;
-    }
-
-    .dashboard-page .small-box h3 {
-        margin: 0 0 0.25rem;
-        font-size: 1.35rem;
-        line-height: 1.1;
-    }
-
-    .dashboard-page .small-box p {
-        margin: 0;
-        font-size: 0.68rem;
-        line-height: 1.2;
-    }
-
-    .dashboard-page .small-box .icon {
-        top: 0.8rem;
-        right: 0.8rem;
-        font-size: 2.3rem;
-    }
 }
