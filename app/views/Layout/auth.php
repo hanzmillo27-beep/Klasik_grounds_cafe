@@ -22,8 +22,12 @@
     <!-- Theme style -->
     <link rel="stylesheet"
           href="<?= BASE_URL ?>/dist/css/adminlte.min.css">
+    <?php
+    $cafeThemePath = PUBLIC_PATH . '/css/cafe-theme.css';
+    $cafeThemeVersion = is_file($cafeThemePath) ? filemtime($cafeThemePath) : 1;
+    ?>
     <link rel="stylesheet"
-          href="<?= BASE_URL ?>/css/cafe-theme.css">
+          href="<?= BASE_URL ?>/css/cafe-theme.css?v=<?= $cafeThemeVersion ?>">
 </head>
 
 <body class="kg-landing-page">
