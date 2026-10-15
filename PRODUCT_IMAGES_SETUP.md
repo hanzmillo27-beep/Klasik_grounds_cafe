@@ -1,7 +1,6 @@
 # Product image setup (Render + Supabase)
 
-1. In Supabase Storage, create a bucket named `product-images` and make it public. The app displays images through the bucket's public object URLs.
-2. Run `product_images_migration.sql` in the Supabase SQL Editor before deploying the code. This adds the nullable image path to `products`, so existing products remain valid.
+1. Run `product_images_migration.sql` in the Supabase SQL Editor before deploying the code. This adds the nullable image path to `products` and creates the public `product-images` bucket.
 3. In Render, add these environment variables to the web service:
    - `SUPABASE_URL`: the project URL, such as `https://<project-ref>.supabase.co`
    - `SUPABASE_SERVICE_ROLE_KEY`: the project's service-role/secret key (keep it only in Render; never put it in GitHub or browser code)
