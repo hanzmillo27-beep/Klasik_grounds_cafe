@@ -3,6 +3,7 @@
 namespace Models;
 
 use Core\Model;
+use Core\SupabaseStorage;
 
 class Kiosk extends Model
 {
@@ -13,6 +14,7 @@ class Kiosk extends Model
                 p.product_id,
                 p.product_name,
                 p.product_price,
+                p.product_image,
                 c.category_name
              FROM products p
              LEFT JOIN categories c
@@ -20,7 +22,11 @@ class Kiosk extends Model
              ORDER BY p.product_name'
         );
 
-        return $stmt->fetchAll();
+        $products = $stmt->fetchAll();
+        foreach ($products as $product) {
+            $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
+        }
+        return $products;
     }
 
     public function submit($data)

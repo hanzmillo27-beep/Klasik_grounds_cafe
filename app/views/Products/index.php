@@ -31,6 +31,7 @@
             <thead>
 
                 <tr>
+                    <th>Photo</th>
                     <th>Product Name</th>
                     <th>Category</th>
                     <th>Price</th>
@@ -57,6 +58,7 @@
         <form
             id="products-form"
             class="modal-content"
+            enctype="multipart/form-data"
         >
 
             <div class="modal-header">
@@ -96,6 +98,16 @@
                         required
                     >
 
+                </div>
+
+                <div class="form-group">
+                    <label for="product_image">Product Photo</label>
+                    <input type="file" name="product_image" id="product_image"
+                        class="form-control-file" accept="image/jpeg,image/png,image/webp">
+                    <small class="form-text text-muted">JPG, PNG, or WebP; maximum 5 MB.</small>
+                    <img id="product-image-preview" class="mt-2 d-none"
+                        alt="Product photo preview" style="max-width: 180px; max-height: 140px; object-fit: cover;">
+                    <div id="product-image-current" class="small text-muted mt-2"></div>
                 </div>
 
 

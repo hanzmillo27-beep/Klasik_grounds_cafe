@@ -3,6 +3,7 @@
 namespace Api\Products;
 
 use Core\BaseController;
+use Core\SupabaseStorage;
 use Models\Products;
 
 class ProductsController extends BaseController
@@ -60,6 +61,8 @@ class ProductsController extends BaseController
             ]);
         }
 
+        $this->attachUploadedImage($data);
+
         if ($this->Products->save($data)) {
             $this->json([
                 'status' => 'success',
@@ -105,6 +108,8 @@ class ProductsController extends BaseController
                     'message' => 'Product price is required.'
                 ]);
             }
+
+            $this->attachUploadedImage($data);
 
             if ($this->Products->save($data)) {
                 $this->json([
@@ -152,4 +157,23 @@ class ProductsController extends BaseController
         'message' => 'Product deleted successfully.'
     ]);
 }
+
+    private function attachUploadedImage(array &$data): void
+    {
+        if (!isset($_FILES['product_image'])) {
+            return;
+        }
+
+        try {
+            $path = (new SupabaseStorage())->uploadProductImage($_FILES['product_image']);
+            if ($path !== null) {
+                $data['product_image'] = $path;
+            }
+        } catch (\RuntimeException $e) {
+            $this->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
 }

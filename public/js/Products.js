@@ -3,6 +3,10 @@ $(document).ready(function () {
     let table;
     let inventory = [];
 
+    function escapeHtml(value) {
+        return $('<div>').text(value ?? '').html();
+    }
+
     function loadCategories() {
 
         $.ajax({
@@ -78,6 +82,17 @@ $(document).ready(function () {
             },
 
             columns: [
+
+                {
+                    data: 'product_image_url',
+                    orderable: false,
+                    searchable: false,
+                    render: function (url) {
+                        return url
+                            ? `<img src="${escapeHtml(url)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:4px;">`
+                            : '';
+                    }
+                },
 
                 {
                     data: 'product_name'
@@ -230,6 +245,8 @@ $(document).ready(function () {
         $('#products-form')[0].reset();
 
         $('#id').val('');
+        $('#product-image-preview').addClass('d-none').attr('src', '');
+        $('#product-image-current').text('');
 
         $('#modal-title').text('Add Product');
 
@@ -410,6 +427,10 @@ $(document).ready(function () {
                     $('#product_price')
                         .val(product.product_price);
 
+                    $('#product-image-preview').toggleClass('d-none', !product.product_image_url)
+                        .attr('src', product.product_image_url || '');
+                    $('#product-image-current').text(product.product_image_url ? 'Current photo (choose a file to replace it).' : '');
+
                     $('#ingredients-container')
                         .empty();
 
@@ -455,6 +476,13 @@ $(document).ready(function () {
             });
         }
     );
+
+    $('#product_image').on('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) return;
+        $('#product-image-preview').attr('src', URL.createObjectURL(file)).removeClass('d-none');
+        $('#product-image-current').text('New photo selected.');
+    });
 
 
 $(document).on(

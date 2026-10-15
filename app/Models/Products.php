@@ -3,6 +3,7 @@
 namespace Models;
 
 use Core\Model;
+use Core\SupabaseStorage;
 
 class Products extends Model
 {
@@ -15,14 +16,18 @@ class Products extends Model
                 p.category_id,
                 c.category_name,
                 p.product_price,
+                p.product_image,
                 p.created_at
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
              ORDER BY p.product_name'
         );
-
-        return $stmt->fetchAll();
+        $products = $stmt->fetchAll();
+        foreach ($products as $product) {
+            $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
+        }
+        return $products;
     }
 
     public function findByID($id)
@@ -33,6 +38,7 @@ class Products extends Model
                 p.product_name,
                 p.category_id,
                 p.product_price,
+                p.product_image,
                 p.created_at
              FROM products p
              WHERE p.product_id = ?'
@@ -45,6 +51,7 @@ class Products extends Model
         if (!$product) {
             return null;
         }
+        $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
 
         $stmt = $this->db->prepare(
             'SELECT
@@ -106,7 +113,8 @@ class Products extends Model
                     'UPDATE products
                      SET product_name = ?,
                          category_id = ?,
-                         product_price = ?
+                         product_price = ?,
+                         product_image = COALESCE(?, product_image)
                      WHERE product_id = ?'
                 );
 
@@ -114,6 +122,7 @@ class Products extends Model
                     $data['product_name'],
                     $data['category_id'],
                     $data['product_price'],
+                    $data['product_image'] ?? null,
                     $data['product_id']
                 ]);
 
@@ -136,15 +145,17 @@ class Products extends Model
                         product_name,
                         category_id,
                         product_price,
+                        product_image,
                         created_at
                     )
-                    VALUES (?, ?, ?, ?)';
+                    VALUES (?, ?, ?, ?, ?)';
                 $stmt = $this->db->prepare($productInsertSql);
 
                 $stmt->execute([
                     $data['product_name'],
                     $data['category_id'],
                     $data['product_price'],
+                    $data['product_image'] ?? null,
                     date('Y-m-d H:i:s')
                 ]);
 

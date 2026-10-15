@@ -4,6 +4,7 @@ namespace Models;
 
 use Core\Model;
 use Core\Auth;
+use Core\SupabaseStorage;
 
 class POS extends Model
 {
@@ -15,14 +16,19 @@ class POS extends Model
                 p.product_name,
                 p.category_id,
                 c.category_name,
-                p.product_price
+                p.product_price,
+                p.product_image
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
              ORDER BY p.product_name'
         );
 
-        return $stmt->fetchAll();
+        $products = $stmt->fetchAll();
+        foreach ($products as $product) {
+            $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
+        }
+        return $products;
     }
 
     public function product($id)

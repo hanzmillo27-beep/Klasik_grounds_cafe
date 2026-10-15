@@ -164,6 +164,7 @@ $(document).ready(function () {
                 items.map((product) => `
                     <div class="col-md-4 col-lg-3 mb-3">
                         <div class="card h-100 product-card">
+                            ${product.product_image_url ? `<img src="${escapeHtml(product.product_image_url)}" alt="${escapeHtml(product.product_name)}" class="card-img-top" style="height:150px;object-fit:cover;">` : ''}
                             <div class="card-body">
                                 <h6 class="fw-bold mb-1">
                                     ${escapeHtml(product.product_name)}

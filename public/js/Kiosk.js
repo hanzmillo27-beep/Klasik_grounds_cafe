@@ -56,6 +56,7 @@ $(document).ready(function () {
             return `
                 <div class="col-md-6 col-xl-4 mb-3">
                     <div class="card h-100">
+                        ${product.product_image_url ? `<img src="${escapeHtml(product.product_image_url)}" alt="${escapeHtml(product.product_name)}" class="card-img-top" style="height:180px;object-fit:cover;">` : ''}
                         <div class="card-body">
                             <h5 class="font-weight-bold">
                                 ${escapeHtml(product.product_name)}

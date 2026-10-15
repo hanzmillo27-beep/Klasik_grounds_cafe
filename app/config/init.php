@@ -34,6 +34,10 @@ define('DB_USER', 'postgres.nwvbeowsjqqlbeajcpsz');
 define('DB_PASS', 'A*DsJnZ*2kWk@Ez');
 define('DB_CHARSET', 'utf8mb4');
 
+define('SUPABASE_URL', rtrim((string) getenv('SUPABASE_URL'), '/'));
+define('SUPABASE_SERVICE_ROLE_KEY', (string) getenv('SUPABASE_SERVICE_ROLE_KEY'));
+define('SUPABASE_STORAGE_BUCKET', (string) (getenv('SUPABASE_STORAGE_BUCKET') ?: 'product-images'));
+
 
 /*
 define('DB_HOST', 'localhost');
