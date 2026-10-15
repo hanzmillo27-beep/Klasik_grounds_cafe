@@ -15,7 +15,11 @@ spl_autoload_register(function (string $class): void {
             continue;
         }
 
-        $className = substr($class, strlen($prefix));
+        $className = str_replace(
+            '\\',
+            DIRECTORY_SEPARATOR,
+            substr($class, strlen($prefix))
+        );
         $file = $directory . $className . '.php';
 
         if (file_exists($file)) {
