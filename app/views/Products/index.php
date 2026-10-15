@@ -61,6 +61,8 @@
             enctype="multipart/form-data"
         >
 
+            <input type="hidden" name="product_id" id="id" value="">
+
             <div class="modal-header">
 
                 <h5
