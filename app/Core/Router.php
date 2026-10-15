@@ -20,12 +20,22 @@ class Router
             $controllerName = 'Controllers\\DashboardController';
             $action = 'index';
             $params = [];
+        } elseif (strtolower($parts[0]) === 'api') {
+            $resource = $parts[1] ?? null;
+            if ($resource === null) {
+                http_response_code(404);
+                exit('API resource not found.');
+            }
+
+            $module = ucfirst($resource);
+            $controllerName = 'Api\\' . $module . '\\' . $module . 'Controller';
+            $action = $parts[2] ?? 'index';
+            $params = array_slice($parts, 3);
         } else {
             $folder = ucfirst($parts[0]);
             $resource = $parts[1] ?? null;
 
-            $folderDirectory = strtolower($folder) === 'api' ? 'api' : $folder;
-            $folderPath = dirname(__DIR__) . '/' . $folderDirectory;
+            $folderPath = dirname(__DIR__) . '/' . $folder;
 
             if (is_dir($folderPath) && $resource) {
                 $controllerName =
