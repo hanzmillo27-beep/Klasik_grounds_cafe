@@ -26,7 +26,7 @@
           href="<?= BASE_URL ?>/css/cafe-theme.css">
 </head>
 
-<body class="hold-transition login-page">
+<body class="cafe-auth-page">
 
     <?= $content ?>
 

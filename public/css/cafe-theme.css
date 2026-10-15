@@ -161,3 +161,183 @@ a:hover,
     position: relative;
     height: 320px;
 }
+
+/* Authentication page */
+.cafe-auth-page {
+    min-height: 100vh;
+    background: #f8f4ed;
+    color: var(--cafe-ink);
+    font-family: "Source Sans Pro", sans-serif;
+}
+
+.cafe-auth-shell {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.95fr) minmax(440px, 1.05fr);
+    min-height: 100vh;
+}
+
+.cafe-auth-showcase {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    padding: clamp(2rem, 5vw, 5rem);
+    color: #fffaf3;
+    background:
+        radial-gradient(circle at 78% 18%, rgba(190, 139, 87, 0.35), transparent 23%),
+        radial-gradient(circle at 12% 90%, rgba(153, 101, 59, 0.28), transparent 27%),
+        linear-gradient(145deg, #2b1c14 0%, #4c3020 52%, #201510 100%);
+}
+
+.cafe-auth-showcase::after {
+    position: absolute;
+    right: -14rem;
+    bottom: -18rem;
+    width: 38rem;
+    height: 38rem;
+    border: 1px solid rgba(255, 244, 226, 0.13);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3rem rgba(255, 244, 226, 0.025), 0 0 0 7rem rgba(255, 244, 226, 0.02);
+    content: "";
+}
+
+.cafe-auth-brand,
+.cafe-auth-showcase-footer,
+.cafe-auth-message {
+    position: relative;
+    z-index: 1;
+}
+
+.cafe-auth-brand {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    color: #fffaf3;
+    font-family: Georgia, serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.02em;
+}
+
+.cafe-auth-brand:hover { color: #fffaf3; text-decoration: none; }
+
+.cafe-auth-brand img,
+.cafe-auth-mobile-brand img {
+    width: 3.3rem;
+    height: 3.3rem;
+    margin-right: 0.8rem;
+    border: 2px solid rgba(255, 250, 243, 0.7);
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.cafe-auth-brand small {
+    display: block;
+    margin-top: -0.15rem;
+    color: #d8ad7d;
+    font-family: "Source Sans Pro", sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.cafe-auth-message { max-width: 33rem; margin: auto 0; }
+
+.cafe-auth-eyebrow {
+    margin: 0 0 1rem;
+    color: #b77e4d;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.cafe-auth-showcase .cafe-auth-eyebrow { color: #e4b883; }
+
+.cafe-auth-message h1 {
+    margin: 0;
+    color: #fffaf3;
+    font-family: Georgia, serif;
+    font-size: clamp(2.7rem, 5vw, 5rem);
+    font-weight: 400;
+    line-height: 1.04;
+}
+
+.cafe-auth-message h1 em { color: #d7a16c; font-weight: 400; }
+
+.cafe-auth-message > p:last-child {
+    max-width: 25rem;
+    margin: 1.6rem 0 0;
+    color: rgba(255, 250, 243, 0.72);
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+.cafe-auth-showcase-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    color: rgba(255, 250, 243, 0.54);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.cafe-auth-rule { width: 2.5rem; height: 1px; background: #bd8656; }
+
+.cafe-auth-form-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem clamp(1.5rem, 7vw, 7rem);
+    background: #fdfbf8;
+}
+
+.cafe-auth-form-wrap { width: 100%; max-width: 27rem; }
+
+.cafe-auth-form-wrap h2 {
+    margin: 0;
+    color: var(--cafe-brown-dark);
+    font-family: Georgia, serif;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    font-weight: 400;
+    line-height: 1.1;
+}
+
+.cafe-auth-subtitle { margin: 0.9rem 0 2.2rem; color: #8b7b6d; }
+.cafe-auth-alert { border: 0; border-radius: 0.7rem; font-size: 0.9rem; }
+.cafe-auth-form .form-group { margin-bottom: 1.35rem; }
+.cafe-auth-form label { margin-bottom: 0.5rem; color: #5d4a3b; font-size: 0.88rem; font-weight: 600; }
+
+.cafe-auth-input-wrap { position: relative; }
+.cafe-auth-input-wrap > i { position: absolute; top: 50%; left: 1rem; z-index: 1; color: #ae8b6b; transform: translateY(-50%); }
+.cafe-auth-input-wrap .form-control { height: 3.35rem; padding-left: 2.85rem; border: 1px solid #e7ddd1; border-radius: 0.7rem; background: #fff; }
+.cafe-auth-input-wrap .form-control:focus { border-color: #b77e4d; box-shadow: 0 0 0 0.2rem rgba(183, 126, 77, 0.14); }
+
+.cafe-auth-submit { height: 3.35rem; margin-top: 0.45rem; border: 0; border-radius: 0.7rem; background: var(--cafe-brown-dark); color: #fffaf3; font-weight: 600; letter-spacing: 0.02em; }
+.cafe-auth-submit:hover, .cafe-auth-submit:focus { background: #2f2017; color: #fffaf3; }
+.cafe-auth-guest { height: 3.2rem; border: 1px solid #d8c5b1; border-radius: 0.7rem; color: var(--cafe-brown-dark); font-weight: 600; }
+.cafe-auth-guest:hover { background: #f4eadf; border-color: #b77e4d; color: var(--cafe-brown-dark); }
+
+.cafe-auth-divider { display: flex; align-items: center; gap: 0.8rem; margin: 1.5rem 0; color: #b3a398; font-size: 0.78rem; text-transform: uppercase; }
+.cafe-auth-divider::before, .cafe-auth-divider::after { height: 1px; flex: 1; background: #eee5dc; content: ""; }
+.cafe-auth-register { margin: 2rem 0 0; color: #927f70; font-size: 0.9rem; text-align: center; }
+.cafe-auth-register a { color: var(--cafe-brown); font-weight: 600; }
+.cafe-auth-mobile-brand { display: none; }
+
+@media (max-width: 800px) {
+    .cafe-auth-shell { display: block; }
+    .cafe-auth-showcase { min-height: 18rem; padding: 1.5rem; }
+    .cafe-auth-message { margin: 3.5rem 0 0; }
+    .cafe-auth-message h1 { font-size: 2.5rem; }
+    .cafe-auth-message > p:last-child, .cafe-auth-showcase-footer { display: none; }
+    .cafe-auth-form-panel { min-height: calc(100vh - 18rem); padding: 2.5rem 1.5rem; }
+}
+
+@media (max-width: 480px) {
+    .cafe-auth-showcase { min-height: 13rem; }
+    .cafe-auth-message { display: none; }
+    .cafe-auth-form-panel { min-height: calc(100vh - 13rem); align-items: flex-start; padding-top: 2rem; }
+    .cafe-auth-mobile-brand { display: block; margin-bottom: 1.5rem; }
+    .cafe-auth-mobile-brand img { width: 3.8rem; height: 3.8rem; margin: 0; }
+}
