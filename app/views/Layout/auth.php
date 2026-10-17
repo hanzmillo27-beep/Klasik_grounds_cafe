@@ -30,7 +30,7 @@
           href="<?= BASE_URL ?>/css/cafe-theme.css?v=<?= $cafeThemeVersion ?>">
 </head>
 
-<body class="kg-landing-page">
+<body class="kg-landing-page<?= ($title ?? '') === 'Login' ? ' kg-auth-page' : '' ?>">
 
     <?= $content ?>
 
