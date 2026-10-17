@@ -19,7 +19,7 @@ function isDelete(callback) {
         text: "You won't be able to revert this!",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#28a745',
+        confirmButtonColor: '#243e32',
         cancelButtonColor: '#d33',
         confirmButtonText: 'Yes, delete it!'
     }).then((confirmed) => {

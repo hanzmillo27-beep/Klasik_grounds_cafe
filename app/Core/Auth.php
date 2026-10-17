@@ -8,7 +8,8 @@ class Auth{
     private const ROLE_ACCESS = [
         'owner' => ['*'],
         'admin' => ['Users'],
-        'cashier' => ['POS'],
+        'cashier' => ['POS', 'Dashboard', 'Products', 'Inventory'],
+        'staff' => ['Dashboard', 'Products', 'Inventory'],
         'user' => ['Kiosk'],
         'loyal_customer' => ['Loyalty', 'Kiosk'],
     ];

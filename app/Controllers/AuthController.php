@@ -56,6 +56,7 @@ class AuthController extends BaseController{
             $destination = [
                 'owner' => '/Dashboard',
                 'admin' => '/Users',
+                'staff' => '/Products',
                 'cashier' => '/POS',
                 'user' => '/Kiosk',
                 'loyal_customer' => '/Loyalty'
