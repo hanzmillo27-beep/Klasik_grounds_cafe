@@ -65,12 +65,15 @@ class Auth{
             return;
         }
 
-        // Guests may order from the public kiosk. Signed-in users still follow their role map.
+        // Menu browsing is public, even when a browser has a stale PHP session cookie.
+        if ($area === 'Api' && $resource === 'Kiosk' && $action === 'products') {
+            return;
+        }
+
+        // Guests may place kiosk orders; signed-in users still follow their role map.
         if ($area === 'Api' && $resource === 'Kiosk'
-            && in_array($action, ['products', 'submit'], true)) {
-            if (!self::check()) {
-                return;
-            }
+            && $action === 'submit' && !self::check()) {
+            return;
         }
         if ($area === 'Controllers' && $resource === 'Kiosk' && !self::check()) {
             return;
