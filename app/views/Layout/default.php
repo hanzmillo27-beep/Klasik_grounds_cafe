@@ -34,7 +34,11 @@
 
   <!-- Theme style -->
   <link rel="stylesheet" href="<?= BASE_URL ?>/dist/css/adminlte.min.css">
-  <link rel="stylesheet" href="<?= BASE_URL ?>/css/cafe-theme.css">
+  <?php
+  $cafeThemePath = PUBLIC_PATH . '/css/cafe-theme.css';
+  $cafeThemeVersion = is_file($cafeThemePath) ? filemtime($cafeThemePath) : 1;
+  ?>
+  <link rel="stylesheet" href="<?= BASE_URL ?>/css/cafe-theme.css?v=<?= $cafeThemeVersion ?>">
 
 </head>
 
@@ -156,7 +160,8 @@
 <?php if (($title ?? '') === 'Dashboard'): ?>
 <script src="<?= BASE_URL ?>/plugins/chart.js/Chart.min.js"></script>
 <?php endif; ?>
-<script src="<?= BASE_URL ?>/js/app.js"></script>
+<?php $appScriptVersion = filemtime(PUBLIC_PATH . '/js/app.js'); ?>
+<script src="<?= BASE_URL ?>/js/app.js?v=<?= $appScriptVersion ?>"></script>
 <?php
 $pageScript = $title ?? 'Dashboard';
 $pageScriptPath = PUBLIC_PATH . '/js/' . $pageScript . '.js';

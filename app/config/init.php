@@ -34,7 +34,7 @@ session_set_cookie_params([
 ]);
 session_start();
 
-define('BASE_PATH', dirname(__DIR__));
+define('BASE_PATH', dirname(__DIR__, 2));
 define('PUBLIC_PATH', BASE_PATH . '/public');
 
 
