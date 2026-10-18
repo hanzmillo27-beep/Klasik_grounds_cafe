@@ -72,9 +72,10 @@ $.ajax = function (options) {
     xhr.readyState = 1;
     xhr.abort = function () { xhr.readyState = 0; deferred.reject(xhr, 'abort', 'abort'); };
     const response = {data: [
-        {inv_id: 1, inv_name: 'Trace stock', amount: h.requests.length === 1 ? '0.001' : h.nextAmount, unit: 'kg'},
-        {inv_id: 2, inv_name: 'Zero stock', amount: '0.000', unit: 'g'},
-        {inv_id: 3, inv_name: h.hostileName, amount: '1.234', unit: h.hostileUnit}
+        {inv_id: 1, inv_name: 'Trace stock', amount: h.requests.length === 1 ? '0.001' : h.nextAmount,
+            unit: 'kg', min_stock: '0.001', is_low: h.requests.length === 1},
+        {inv_id: 2, inv_name: 'Zero stock', amount: '0.000', unit: 'g', min_stock: '0.000', is_low: true},
+        {inv_id: 3, inv_name: h.hostileName, amount: '1.234', unit: h.hostileUnit, min_stock: '1.000', is_low: false}
     ]};
     setTimeout(function () {
         xhr.readyState = 4;
@@ -175,6 +176,19 @@ try {
     const tiny = new Intl.NumberFormat(undefined, {minimumFractionDigits: 3, maximumFractionDigits: 3}).format(0.001);
     assert(row('Trace stock')[1].textContent.trim() === tiny, 'Stock 0.001 was rounded away or lost its third decimal.');
     assert(/^0(?:[.,]0{1,3})?$/.test(row('Zero stock')[1].textContent.trim()), 'Zero stock must remain visible.');
+    const minimum = document.querySelector('#min_stock');
+    assert(minimum && minimum.type === 'number' && Number(minimum.value) === 10,
+        'The minimum-stock input with its default threshold is missing.');
+    assert(minimum.min === '0' && minimum.max === '999999999.999' && minimum.step === '0.001',
+        'Minimum stock must support nonnegative quantities with three decimal places.');
+    const headings = Array.from(document.querySelectorAll('#inventory-table thead th')).map(cell => cell.textContent.trim());
+    assert(headings[3] === 'Minimum stock' && headings[4] === 'Status', 'Minimum stock and status columns are missing.');
+    assert(row('Trace stock')[3].textContent.trim() === tiny && row('Trace stock')[4].textContent.trim() === 'Low stock',
+        'Stock equal to its positive threshold must display Low stock.');
+    assert(/^0(?:[.,]0{1,3})?$/.test(row('Zero stock')[3].textContent.trim())
+        && row('Zero stock')[4].textContent.trim() === 'Low stock', 'Zero stock at a zero threshold must display Low stock.');
+    assert(/^1(?:[.,]0{1,3})?$/.test(row(h.hostileName)[3].textContent.trim())
+        && row(h.hostileName)[4].textContent.trim() === 'In stock', 'An item above its own threshold must display In stock.');
     safeText();
     assert(h.requests.length === 1, 'Initial inventory load must make one list request.');
     const refresh = document.querySelector('#btnRefreshInventory');
@@ -187,10 +201,12 @@ try {
     }
     assert(h.requests.length === 2 && row('Trace stock')[1].textContent.trim() === updated,
         'Refresh must fetch and display the latest inventory quantity.');
+    assert(row('Trace stock')[3].textContent.trim() === tiny && row('Trace stock')[4].textContent.trim() === 'In stock',
+        'Refresh must update stock status while preserving the item threshold.');
     safeText();
     assert(!h.errors.length && h.requests.every(request => request.method === 'GET' && request.path === '/api/Inventory/all'),
         'The browser must use only the offline inventory list GET: ' + h.errors.join('; '));
-    return 'Inventory browser checks passed: 0.001 precision, zero stock, literal hostile name/unit, and Refresh fetching updated stock. No CRUD or external requests.';
+    return 'Inventory browser checks passed: stock precision, per-item thresholds, equality/zero/above-threshold status, safe text, and Refresh. No CRUD or external requests.';
 })()
 '@
     Write-Output (Evaluate-Js $checks)

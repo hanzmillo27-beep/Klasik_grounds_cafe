@@ -13,12 +13,15 @@ class Inventory extends Model
                 inv_id,
                 inv_name,
                 amount,
+                min_stock,
                 unit
              FROM inventory
              ORDER BY inv_name'
         );
 
-        return $stmt->fetchAll();
+        $items = $stmt->fetchAll();
+        foreach ($items as $item) $item->is_low = (float) $item->amount <= (float) $item->min_stock;
+        return $items;
     }
 
     public function findByID($id)
@@ -28,6 +31,7 @@ class Inventory extends Model
                 inv_id,
                 inv_name,
                 amount,
+                min_stock,
                 unit
              FROM inventory
              WHERE inv_id = ?'
@@ -35,7 +39,9 @@ class Inventory extends Model
 
         $stmt->execute([$id]);
 
-        return $stmt->fetch() ?: null;
+        $item = $stmt->fetch() ?: null;
+        if ($item) $item->is_low = (float) $item->amount <= (float) $item->min_stock;
+        return $item;
     }
 
     public function save($data)
@@ -44,12 +50,14 @@ class Inventory extends Model
         $data['inv_name'] = trim($data['inv_name']);
         $data['unit'] = trim($data['unit']);
         $data['amount'] = round((float) $data['amount'], 3);
+        $minimum = $data['min_stock'] ?? (!empty($data['inv_id']) ? $this->findByID($data['inv_id'])->min_stock : 10);
         if (!empty($data['inv_id'])) {
 
             $stmt = $this->db->prepare(
                 'UPDATE inventory
                  SET inv_name = ?,
                      amount = ?,
+                     min_stock = ?,
                      unit = ?
                  WHERE inv_id = ?'
             );
@@ -57,6 +65,7 @@ class Inventory extends Model
             return $stmt->execute([
                 $data['inv_name'],
                 $data['amount'],
+                $minimum,
                 $data['unit'],
                 $data['inv_id'],
             ]);
@@ -67,14 +76,16 @@ class Inventory extends Model
             (
                 inv_name,
                 amount,
+                min_stock,
                 unit
             )
-            VALUES (?, ?, ?)'
+            VALUES (?, ?, ?, ?)'
         );
 
         return $stmt->execute([
             $data['inv_name'],
             $data['amount'],
+            $minimum,
             $data['unit'],
         ]);
     }
@@ -85,6 +96,7 @@ class Inventory extends Model
         if (!is_string($data['unit'] ?? null) || trim($data['unit']) === '' || strlen(trim($data['unit'])) > 30) return 'Enter a unit of up to 30 characters.';
         $amount = $data['amount'] ?? null;
         if (!self::validQuantity($amount)) return 'Enter a nonnegative quantity with at most three decimal places.';
+        if (array_key_exists('min_stock', $data) && !self::validQuantity($data['min_stock'])) return 'Enter a nonnegative minimum stock with at most three decimal places.';
         $id = $data['inv_id'] ?? null;
         if ($id !== null && $id !== '' && (!filter_var($id, FILTER_VALIDATE_INT) || $id < 1 || !$this->findByID($id))) return 'Inventory item not found.';
         $stmt = $this->db->prepare('SELECT inv_id FROM inventory WHERE LOWER(inv_name) = LOWER(?) AND inv_id <> ?');

@@ -132,7 +132,7 @@ class Dashboard extends Model
                 COUNT(*) AS total_items,
                 SUM(
                     CASE
-                        WHEN amount <= 10 THEN 1
+                        WHEN amount <= min_stock THEN 1
                         ELSE 0
                     END
                 ) AS low_stock
@@ -148,7 +148,7 @@ class Dashboard extends Model
             'SELECT
                 expense_id,
                 expense_name,
-                amount,
+                amount, min_stock,
                 expense_date
              FROM daily_expenses
              ORDER BY expense_date DESC, expense_id DESC
@@ -164,16 +164,16 @@ class Dashboard extends Model
             'SELECT
                 inv_id,
                 inv_name,
-                amount,
+                amount, min_stock,
                 unit,
                 CASE
-                    WHEN amount <= 10 THEN \'Low Stock\'
+                    WHEN amount <= min_stock THEN \'Low Stock\'
                     ELSE \'Available\'
                 END AS stock_status
              FROM inventory
              ORDER BY
                 CASE
-                    WHEN amount <= 10 THEN 0
+                    WHEN amount <= min_stock THEN 0
                     ELSE 1
                 END,
                 inv_name'

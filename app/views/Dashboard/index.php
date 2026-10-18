@@ -330,6 +330,7 @@
                                     <th>
                                         Status
                                     </th>
+                                    <th>Minimum stock</th>
 
                                 </tr>
 
@@ -342,7 +343,7 @@
                                     <tr>
 
                                         <td
-                                            colspan="4"
+                                            colspan="5"
                                             class="text-center text-muted py-4"
                                         >
                                             No inventory items.
@@ -365,7 +366,7 @@
                                             <td>
                                                 <?= number_format(
                                                     $item->amount,
-                                                    2
+                                                    3
                                                 ) ?>
                                             </td>
 
@@ -395,7 +396,7 @@
                                                 <?php endif; ?>
 
                                             </td>
-
+                                            <td><?= number_format($item->min_stock, 3) ?></td>
                                         </tr>
 
                                     <?php endforeach; ?>

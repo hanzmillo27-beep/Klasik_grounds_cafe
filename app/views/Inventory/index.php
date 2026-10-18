@@ -38,6 +38,8 @@
                     <th>Name</th>
                     <th>Current stock</th>
                     <th>Unit</th>
+                    <th>Minimum stock</th>
+                    <th>Status</th>
                     <th class="text-center">Option</th>
                 </tr>
 
@@ -153,6 +155,11 @@
                 </div>
 
 
+                <div class="form-group">
+                    <label for="min_stock">Minimum stock</label>
+                    <input type="number" id="min_stock" name="min_stock" class="form-control" min="0" max="999999999.999" step="0.001" value="10" required>
+                    <small class="text-muted">Low stock is shown at or below this quantity.</small>
+                </div>
                 <div class="row">
 
                     <div class="col-md-7">

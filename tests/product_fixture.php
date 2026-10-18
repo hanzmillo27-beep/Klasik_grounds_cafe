@@ -13,6 +13,7 @@ $db->exec('CREATE TABLE categories (
 $db->exec('CREATE TABLE inventory (
     inv_id ' . $identity . ', inv_name VARCHAR(150) NOT NULL,
     amount NUMERIC(12,3) NOT NULL, unit VARCHAR(30) NOT NULL,
+    min_stock NUMERIC(12,3) NOT NULL DEFAULT 10,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )');
 $db->exec('CREATE TABLE products (

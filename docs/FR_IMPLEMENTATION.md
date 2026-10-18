@@ -35,7 +35,7 @@ The earlier audit is retained as the historical baseline.
 | FR-027 | Complete | `php tests/fr_027.php`; validated atomic stock additions, exact fractional quantities, missing/overflow rejection |
 | FR-028 | Complete | `php tests/fr_028.php` SQLite/PostgreSQL; isolated `tests/stock_concurrency.php` confirms competing shared-stock sales cannot oversell |
 | FR-029 | Complete | `php tests/fr_029.php`; `tests/browser-inventory.ps1`; current quantities, three-decimal safe table, refreshed stock |
-| FR-030 | Pending | |
+| FR-030 | Complete | `php tests/fr_030.php`; per-item minimums and inclusive low-stock boundaries across Inventory/Dashboard; PostgreSQL migration |
 | FR-031 | Pending | |
 | FR-032 | Pending | |
 | FR-033 | Pending | |
