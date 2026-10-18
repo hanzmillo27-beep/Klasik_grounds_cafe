@@ -220,8 +220,9 @@ $(document).ready(function () {
                             id="ingredient_quantity_${rowId}"
                             class="form-control ingredient-quantity"
                             value="${quantity}"
-                            min="0.01"
-                            step="0.01"
+                            min="0.001"
+                            max="999999999.999"
+                            step="0.001"
                             placeholder="Quantity"
                             required
                         >

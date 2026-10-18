@@ -272,7 +272,7 @@ class Products extends Model
         foreach ($names as $index=>$name) {
             if (!is_string($name) || trim($name) === '') return 'Choose an inventory item for each ingredient.';
             $quantity = $quantities[$index] ?? null;
-            if (!is_numeric($quantity) || !is_finite((float) $quantity) || $quantity <= 0) return 'Ingredient quantities must be positive.';
+            if (!Inventory::validQuantity($quantity, false)) return 'Ingredient quantities must be positive with at most three decimal places.';
             $name = strtolower(trim($name));
             if (isset($seen[$name])) return 'Use each ingredient only once.';
             $seen[$name] = true;

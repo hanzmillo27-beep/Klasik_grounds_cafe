@@ -33,7 +33,7 @@ The earlier audit is retained as the historical baseline.
 | FR-025 | Complete | `php tests/fr_025.php`; database-generated unique sale IDs, stable receipt/retry identity, deployed primary key confirmed |
 | FR-026 | Complete | `php tests/fr_026.php`; validated zero/fractional stock creation, unique names, existing edit targets, accurate form precision |
 | FR-027 | Complete | `php tests/fr_027.php`; validated atomic stock additions, exact fractional quantities, missing/overflow rejection |
-| FR-028 | Pending | |
+| FR-028 | Complete | `php tests/fr_028.php` SQLite/PostgreSQL; isolated `tests/stock_concurrency.php` confirms competing shared-stock sales cannot oversell |
 | FR-029 | Pending | |
 | FR-030 | Pending | |
 | FR-031 | Pending | |

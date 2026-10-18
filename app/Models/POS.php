@@ -261,32 +261,10 @@ class POS extends Model
 
             }
 
-            if (
-                !isset($data['items'])
-                || !is_array($data['items'])
-                || count($data['items']) === 0
-                || count($data['items']) > 100
-            ) {
-                throw new \Exception('Cart is empty.');
-            }
-
+            $quantities = $this->cartQuantities($data['items'] ?? null);
             $items = [];
-            $total = 0;
             $totalCents = 0;
-            $seen = [];
-
-            foreach ($data['items'] as $item) {
-                if (!is_array($item)) throw new \Exception('Invalid cart item.');
-                $productId = filter_var($item['product_id'] ?? null, FILTER_VALIDATE_INT);
-                $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
-                if (!$productId || $productId < 1 || !$quantity || $quantity < 1 || $quantity > 99 || isset($seen[$productId])) {
-                    throw new \Exception('Invalid cart item.');
-                }
-                $seen[$productId] = true;
-
-                $productId = (int) $productId;
-                $quantity = (int) $quantity;
-
+            foreach ($quantities as $productId => $quantity) {
                 /*
                  * Lock the current product row and confirm it still exists.
                  */
@@ -361,49 +339,28 @@ class POS extends Model
             $amountPaid = $paidCents / 100;
             $changeAmount = ($paidCents - $totalCents) / 100;
 
-            /*
-             * Check all required ingredients before creating the sale.
-             */
+            $demand = [];
             foreach ($items as $item) {
-                $stmt = $this->db->prepare(
-                    'SELECT
-                        pi.inv_id,
-                        pi.quantity_required,
-                        i.inv_name,
-                        i.amount,
-                        i.unit
-                     FROM product_ingredients pi
-                     INNER JOIN inventory i
-                        ON i.inv_id = pi.inv_id
-                     WHERE pi.product_id = ?
-                     ' . $this->lockClause()
-                );
-
+                $stmt = $this->db->prepare('SELECT inv_id, quantity_required FROM product_ingredients WHERE product_id = ? ORDER BY inv_id' . $this->lockClause());
                 $stmt->execute([$item['product_id']]);
-
-                $ingredients = $stmt->fetchAll();
-
-                foreach ($ingredients as $ingredient) {
-                    $required = (float) $ingredient->quantity_required
-                        * $item['quantity'];
-
-                    $available = (float) $ingredient->amount;
-
-                    if ($available < $required) {
-                        throw new \Exception(
-                            'Insufficient inventory for ' .
-                            $ingredient->inv_name .
-                            '. Available: ' .
-                            $available . ' ' .
-                            $ingredient->unit .
-                            ', Required: ' .
-                            $required . ' ' .
-                            $ingredient->unit . '.'
-                        );
+                foreach ($stmt->fetchAll() as $ingredient) {
+                    if (!Inventory::validQuantity($ingredient->quantity_required, false)) {
+                        throw new \Exception('Invalid ingredient quantity. Update the product recipe before checkout.');
                     }
+                    $required = (int) round((float) $ingredient->quantity_required * 1000) * $item['quantity'];
+                    $demand[$ingredient->inv_id] = ($demand[$ingredient->inv_id] ?? 0) + $required;
                 }
             }
-
+            ksort($demand);
+            foreach ($demand as $inventoryId => $required) {
+                $stmt = $this->db->prepare('SELECT inv_name, amount, unit FROM inventory WHERE inv_id = ?' . $this->lockClause());
+                $stmt->execute([$inventoryId]);
+                $inventory = $stmt->fetch();
+                if (!$inventory || !Inventory::validQuantity($inventory->amount)) throw new \Exception('Invalid inventory item in product recipe.');
+                if ((int) round((float) $inventory->amount * 1000) < $required) {
+                    throw new \Exception('Insufficient inventory for ' . $inventory->inv_name . '.');
+                }
+            }
             $customerName = trim($data['customer_name'] ?? '');
 
             if ($customerName === '') {
@@ -460,7 +417,7 @@ class POS extends Model
 
             $deductInventory = $this->db->prepare(
                 'UPDATE inventory
-                 SET amount = amount - ?
+                 SET amount = ROUND(amount - ?, 3)
                  WHERE inv_id = ?
                    AND amount >= ?'
             );
@@ -475,40 +432,12 @@ class POS extends Model
                     $item['subtotal']
                 ]);
 
-                $stmt = $this->db->prepare(
-                    'SELECT
-                        inv_id,
-                        quantity_required
-                     FROM product_ingredients
-                     WHERE product_id = ?'
-                );
-
-                $stmt->execute([$item['product_id']]);
-
-                $ingredients = $stmt->fetchAll();
-
-                foreach ($ingredients as $ingredient) {
-                    $required = (float) $ingredient->quantity_required
-                        * $item['quantity'];
-
-                    if ($required <= 0) {
-                        continue;
-                    }
-
-                    $deductInventory->execute([
-                        $required,
-                        $ingredient->inv_id,
-                        $required
-                    ]);
-
-                    if ($deductInventory->rowCount() !== 1) {
-                        throw new \Exception(
-                            'Inventory changed during checkout. Please try again.'
-                        );
-                    }
-                }
             }
-
+            foreach ($demand as $inventoryId => $requiredUnits) {
+                $required = number_format($requiredUnits / 1000, 3, '.', '');
+                $deductInventory->execute([$required, $inventoryId, $required]);
+                if ($deductInventory->rowCount() !== 1) throw new \Exception('Inventory changed during checkout. Please try again.');
+            }
             /*
              * Mark the kiosk order completed in the same transaction.
              * If this update fails, all sale and inventory changes roll back.
@@ -586,9 +515,8 @@ class POS extends Model
         }
     }
 
-    private function checkoutFingerprint(array $data, ?int $kioskId): string
+    private function cartQuantities($rows): array
     {
-        $rows = $data['items'] ?? null;
         if (!is_array($rows) || !$rows || count($rows) > 100) throw new \Exception('Cart is empty or invalid.');
         $items = [];
         foreach ($rows as $row) {
@@ -599,6 +527,12 @@ class POS extends Model
             $items[$id] = $quantity;
         }
         ksort($items);
+        return $items;
+    }
+
+    private function checkoutFingerprint(array $data, ?int $kioskId): string
+    {
+        $items = $this->cartQuantities($data['items'] ?? null);
         return hash('sha256', json_encode([$items, trim($data['customer_name'] ?? ''),
             Money::paymentCents($data['amount_paid'] ?? null), $kioskId,
             isset($data['expected_total']) ? Money::cents($data['expected_total']) : null]));
