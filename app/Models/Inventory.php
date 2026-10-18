@@ -100,8 +100,8 @@ class Inventory extends Model
         $amount = number_format((float) $amount, 3, '.', '');
         $stmt = $this->db->prepare(
             'UPDATE inventory
-             SET amount = amount + ?
-             WHERE inv_id = ? AND amount <= 999999999.999 - ?'
+             SET amount = ROUND(amount + ?, 3)
+             WHERE inv_id = ? AND amount <= ROUND(999999999.999 - ?, 3)'
         );
 
         $stmt->execute([$amount, $id, $amount]);
