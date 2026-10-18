@@ -18,16 +18,23 @@ $(document).ready(function () {
         if (value == null) return type === 'display' ? 'Not recorded' : '';
         return type === 'display' ? money(value) : decimal(value);
     }
-    function exportOptions(forPrint, products) {
+    function renderQuantity(value, type) {
+        return type === 'display' ? Number(value || 0).toLocaleString(undefined, {maximumFractionDigits: 3})
+            : Number(value || 0).toFixed(3);
+    }
+    function exportOptions(forPrint, products, inventory) {
         function output(value) { return forPrint ? escapeHtml(value) : spreadsheetText(value); }
         return {
-            columns: products ? [0, 1, 2] : [0, 1, 2, 3, 4, 5, 6], orthogonal: 'export',
+            columns: inventory ? [0, 1, 2, 3, 4] : products ? [0, 1, 2] : [0, 1, 2, 3, 4, 5, 6], orthogonal: 'export',
             modifier: {search: 'none', order: 'applied', page: 'all', selected: null},
             stripHtml: false, decodeEntities: false, stripNewlines: false, trim: false,
             format: {
                 header: function (value, column, node) { return output($(node).text()); },
                 body: function (value) { return output(value); },
                 footer: function (value, column) {
+                    if (inventory) return output(!report ? '' : column === 0 ? report.label
+                        : column === 3 ? 'Items: ' + Number(report.total_items)
+                        : column === 4 ? 'Low stock: ' + Number(report.low_stock_count) : '');
                     return output(!report ? '' : column === 0 ? report.label + ' total'
                         : products && column === 1 ? text(report.total_quantity)
                         : column === (products ? 2 : 4) ? decimal(report.total_amount) : '');
@@ -35,18 +42,21 @@ $(document).ready(function () {
             }
         };
     }
-    function reportButtons(products) {
+    function reportButtons(products, inventory) {
         return [
             {extend: 'csvHtml5', text: 'Export CSV', footer: true, bom: true,
                 filename: function () {
+                    if (inventory) return report ? 'inventory-' + text(report.generated_at).replace(/[^0-9]/g, '') : 'inventory-report';
                     return report ? (products ? 'product-sales-' + report.period : report.period + '-sales') + '-' + report.start_date
                         + (report.period === 'daily' ? '' : '-to-' + report.end_date) : 'sales-report';
                 },
-                exportOptions: exportOptions(false, products)},
+                exportOptions: exportOptions(false, products, inventory)},
             {extend: 'print', text: 'Print report', footer: true,
                 title: function () { return report ? escapeHtml(report.label) : 'Sales report'; },
-                messageTop: function () { return report ? 'Transactions: ' + Number(report.transaction_count) : ''; },
-                exportOptions: exportOptions(true, products)}
+                messageTop: function () { return !report ? '' : inventory
+                    ? 'Items: ' + Number(report.total_items) + '; Low stock: ' + Number(report.low_stock_count)
+                    : 'Transactions: ' + Number(report.transaction_count); },
+                exportOptions: exportOptions(true, products, inventory)}
         ];
     }
 
@@ -75,8 +85,21 @@ $(document).ready(function () {
         ],
         buttons: reportButtons(true)
     });
+    const inventoryTable = $('#inventory-report-table').DataTable({
+        data: [], autoWidth: false, searching: false, pageLength: 25, order: [[0, 'asc']], dom: 'Brtip',
+        language: {emptyTable: 'No inventory items found.'},
+        columns: [
+            {data: 'inv_name', render: renderText},
+            {data: 'amount', render: renderQuantity},
+            {data: 'unit', render: renderText},
+            {data: 'min_stock', render: renderQuantity},
+            {data: 'is_low', render: function (low, type) { return renderText(low ? 'Low stock' : 'In stock', type); }}
+        ],
+        buttons: reportButtons(false, true)
+    });
     table.buttons().disable();
     productTable.buttons().disable();
+    inventoryTable.buttons().disable();
 
     function clearReport() {
         report = null;
@@ -84,8 +107,10 @@ $(document).ready(function () {
         table.buttons().disable();
         productTable.clear().draw();
         productTable.buttons().disable();
+        inventoryTable.clear().draw();
+        inventoryTable.buttons().disable();
         $('#sales-report-results').prop('hidden', true);
-        $('#report-label, #report-count, #report-total, #report-footer-total, #product-footer-quantity, #product-footer-total').text('');
+        $('#report-label, #report-count, #report-total, #report-footer-total, #product-footer-quantity, #product-footer-total, #inventory-low-count, #inventory-footer-count, #inventory-footer-low').text('');
     }
     function showError(message) {
         clearReport();
@@ -99,8 +124,9 @@ $(document).ready(function () {
         $('#report-error').text('').prop('hidden', true);
         const period = $('#report-period').val();
         const products = $('#report-type').val() === 'products';
+        const inventory = $('#report-type').val() === 'inventory';
         const date = $(period === 'weekly' ? '#report-week' : period === 'monthly' ? '#report-month' : '#report-date').val();
-        if (!date || !$('#sales-report-form')[0].checkValidity()) {
+        if ((!inventory && !date) || !$('#sales-report-form')[0].checkValidity()) {
             showError(period === 'weekly' ? 'Choose a valid report week.'
                 : period === 'monthly' ? 'Choose a valid report month.' : 'Choose a valid report date.');
             $('#generate-sales-report').prop('disabled', false);
@@ -108,8 +134,8 @@ $(document).ready(function () {
         }
         $('#report-message').text('Loading report...');
         $('#generate-sales-report').prop('disabled', true);
-        request = $.ajax({url: `${base_url}/api/Reports/${products ? 'products' : 'sales'}`, type: 'GET', dataType: 'json',
-            data: {period: period, date: date}})
+        request = $.ajax({url: `${base_url}/api/Reports/${inventory ? 'inventory' : products ? 'products' : 'sales'}`, type: 'GET', dataType: 'json',
+            data: inventory ? {} : {period: period, date: date}})
             .done(function (response) {
                 if (number !== requestNumber) return;
                 if (response.status !== 'success' || !response.data || !Array.isArray(response.data.rows)) {
@@ -117,17 +143,23 @@ $(document).ready(function () {
                     return;
                 }
                 report = response.data;
-                const activeTable = products ? productTable : table;
+                const activeTable = inventory ? inventoryTable : products ? productTable : table;
                 activeTable.rows.add(report.rows).draw();
                 $('#report-label').text(report.label);
-                $('#report-count').text(Number(report.transaction_count) + (Number(report.transaction_count) === 1 ? ' transaction' : ' transactions'));
-                $('#report-total, #report-footer-total').text(money(report.total_amount));
+                $('#report-count').text(inventory ? Number(report.total_items) + ' items'
+                    : Number(report.transaction_count) + (Number(report.transaction_count) === 1 ? ' transaction' : ' transactions'));
+                $('#report-money-summary').prop('hidden', inventory);
+                $('#inventory-low-count').prop('hidden', !inventory).text(inventory ? ' | ' + Number(report.low_stock_count) + ' low stock' : '');
+                $('#report-total, #report-footer-total').text(inventory ? '' : money(report.total_amount));
                 $('#product-footer-quantity').text(text(report.total_quantity));
-                $('#product-footer-total').text(money(report.total_amount));
-                $('#sales-report-wrapper').prop('hidden', products);
+                $('#product-footer-total').text(inventory ? '' : money(report.total_amount));
+                $('#sales-report-wrapper').prop('hidden', products || inventory);
                 $('#product-report-wrapper').prop('hidden', !products);
+                $('#inventory-report-wrapper').prop('hidden', !inventory);
+                $('#inventory-footer-count').text(inventory ? 'Items: ' + Number(report.total_items) : '');
+                $('#inventory-footer-low').text(inventory ? 'Low stock: ' + Number(report.low_stock_count) : '');
                 $('#sales-report-results').prop('hidden', false);
-                $('#report-message').text(report.rows.length ? '' : 'No completed transactions for this period.');
+                $('#report-message').text(report.rows.length ? '' : inventory ? 'No inventory items found.' : 'No completed transactions for this period.');
                 activeTable.buttons().enable();
                 activeTable.columns.adjust();
             })
@@ -152,15 +184,18 @@ $(document).ready(function () {
     }
     function updatePeriodFields() {
         const period = $('#report-period').val();
-        $('#report-date').prop('disabled', period !== 'daily').prop('required', period === 'daily');
-        $('#report-week').prop('disabled', period !== 'weekly').prop('required', period === 'weekly');
-        $('#report-month').prop('disabled', period !== 'monthly').prop('required', period === 'monthly');
+        const inventory = $('#report-type').val() === 'inventory';
+        $('#report-period-controls').prop('hidden', inventory);
+        $('#report-period').prop('disabled', inventory);
+        $('#report-date').prop('disabled', inventory || period !== 'daily').prop('required', !inventory && period === 'daily');
+        $('#report-week').prop('disabled', inventory || period !== 'weekly').prop('required', !inventory && period === 'weekly');
+        $('#report-month').prop('disabled', inventory || period !== 'monthly').prop('required', !inventory && period === 'monthly');
         $('#report-date-field').prop('hidden', period !== 'daily');
         $('#report-week-field').prop('hidden', period !== 'weekly');
         $('#report-month-field').prop('hidden', period !== 'monthly');
     }
     $('#report-period').on('change', function () { updatePeriodFields(); clearSelection(); });
-    $('#report-type').on('change', clearSelection);
+    $('#report-type').on('change', function () { updatePeriodFields(); clearSelection(); });
     $('#sales-report-form').on('submit', function (event) { event.preventDefault(); loadReport(); });
     updatePeriodFields();
     loadReport();

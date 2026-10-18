@@ -9,7 +9,7 @@ class Auth{
         'owner' => ['*'],
         'admin' => ['Users'],
         'cashier' => ['POS', 'Dashboard', 'Products', 'Inventory'],
-        'staff' => ['Dashboard', 'Products', 'Inventory'],
+        'staff' => ['Dashboard', 'Products', 'Inventory', 'Reports'],
         'user' => ['Kiosk'],
         'loyal_customer' => ['Loyalty', 'Kiosk'],
     ];
@@ -43,6 +43,10 @@ class Auth{
         $allowed = array_map('strtolower', self::ROLE_ACCESS[$role] ?? []);
         if ($role === 'owner') return !in_array($module, ['kiosk', 'loyalty'], true);
         if (!in_array($module, $allowed, true)) return false;
+        if ($module === 'reports' && $role === 'staff') {
+            return (strtolower($area) === 'controllers' && $action === 'index')
+                || (strtolower($area) === 'api' && $action === 'inventory');
+        }
         if (strtolower($area) === 'api' && in_array($module, ['products', 'inventory'], true)) {
             if ($role === 'staff' && $module === 'inventory' && $action === 'restock') return true;
             return in_array($action, ['all', 'categories', 'inventory', 'products', 'product'], true)

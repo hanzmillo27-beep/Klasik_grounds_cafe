@@ -40,4 +40,44 @@ The earlier audit is retained as the historical baseline.
 | FR-032 | Complete | `php tests/fr_032.php`; selected ISO weeks, Monday/Sunday boundaries and cross-year reports with CSV/print |
 | FR-033 | Complete | `php tests/fr_033.php`; selected monthly reports, leap years, month/year boundaries and matching exports |
 | FR-034 | Complete | `php tests/fr_034.php`; quantities/revenue by product for selected periods using saved sale snapshots and CSV/print |
-| FR-035 | Pending | |
+| FR-035 | Complete | `php tests/fr_035.php`; current inventory snapshot with quantities/minimums/status, safe CSV/print and inventory-only staff access |
+
+All 35 acceptance scripts pass. Critical database paths were also checked using
+isolated PostgreSQL schemas, including two concurrent sales competing for the
+last shared ingredient. The browser harnesses use the actual PHP views, local
+jQuery/Bootstrap/DataTables assets, and offline API fixtures.
+
+Run the requirement checks from the project root in PowerShell:
+
+```powershell
+Get-ChildItem tests/fr_*.php | ForEach-Object {
+    php $_.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Requirement check failed: $($_.Name)" }
+}
+php tests/rate_limiter.php
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-pos.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-inventory.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-reports.ps1
+```
+
+For PostgreSQL, enable PDO's PostgreSQL extension and use the isolated runner:
+
+```powershell
+php -d extension=php_pdo_pgsql.dll -d auto_prepend_file=tests/postgres.php tests/fr_035.php
+php -d extension=php_pdo_pgsql.dll -d auto_prepend_file=tests/postgres.php tests/stock_concurrency.php
+```
+
+The runner creates and removes its own randomly named schema and uses the
+session-mode connection on port 5432. Application connections continue using
+the configured production port.
+
+Database migrations in `migrations/` were applied to the configured PostgreSQL
+database before publishing the code that uses them. On another existing
+database, run each file in filename order through `php scripts/migrate.php
+<filename.sql>`. The migration ledger makes repeat runs safe. Historical sales
+retain unknown payment/change values as NULL; all new checkouts require payment.
+
+Owners can open `/Reports` for sales, product sales, and inventory reports.
+Inventory staff can open `/Reports` for inventory snapshots only. Report CSV and
+print exports use the loaded period/snapshot, including totals or inventory
+counts. Inventory quantities and minimums support three decimal places.

@@ -57,8 +57,9 @@ $.ajax = function (options) {
     const h = __reportsHarness, url = new URL(options.url);
     const query = Object.assign(Object.fromEntries(url.searchParams), options.data || {});
     const method = String(options.type || options.method || 'GET').toUpperCase();
-    h.requests.push({path: url.pathname, method: method, period: query.period, date: query.date});
-    if (!['/api/Reports/sales', '/api/Reports/products'].includes(url.pathname) || method !== 'GET' || !['daily', 'weekly', 'monthly'].includes(query.period)) {
+    h.requests.push({path: url.pathname, method: method, period: query.period, date: query.date, queryKeys: Object.keys(query)});
+    if (!['/api/Reports/sales', '/api/Reports/products', '/api/Reports/inventory'].includes(url.pathname) || method !== 'GET'
+        || (url.pathname !== '/api/Reports/inventory' && !['daily', 'weekly', 'monthly'].includes(query.period))) {
         h.errors.push('Disallowed report request.'); throw new Error('Only offline daily/weekly/monthly report GETs are allowed.');
     }
     const deferred = $.Deferred(), xhr = deferred.promise();
@@ -68,7 +69,14 @@ $.ajax = function (options) {
         if (xhr.readyState === 0) return;
         xhr.readyState = 4;
         let response;
-        if (url.pathname === '/api/Reports/products') {
+        if (url.pathname === '/api/Reports/inventory') {
+            response = {status: 'success', data: {report_type: 'inventory', generated_at: '2026-10-19 12:34:56',
+                label: 'Inventory report: 2026-10-19 12:34:56', total_items: 3, low_stock_count: 2, rows: [
+                    {inv_id: 1, inv_name: '=Trace stock', amount: '0.001', unit: '@kg', min_stock: '0.010', is_low: true},
+                    {inv_id: 2, inv_name: 'Zero stock', amount: '0.000', unit: 'g', min_stock: '0.000', is_low: true},
+                    {inv_id: 3, inv_name: h.hostile, amount: '2.345', unit: '<b>kg</b>', min_stock: '1.000', is_low: false}
+                ]}};
+        } else if (url.pathname === '/api/Reports/products') {
             const weekly = query.period === 'weekly';
             if ((!weekly && query.date !== '2026-10-19') || (weekly && query.date !== '2026-W43')) throw new Error('Unexpected product-report fixture period.');
             response = {status: 'success', data: {report_type: 'products', period: query.period,
@@ -130,6 +138,13 @@ $($assetTags -join [Environment]::NewLine)
 </body></html>
 "@
 Set-Content -LiteralPath $htmlPath -Encoding UTF8 -Value $html
+$staffRendererPath = Join-Path $artifactDirectory 'render-staff-reports.php'
+$staffHtmlPath = Join-Path $artifactDirectory 'staff-reports.html'
+$staffPhpRenderer = '<?php $today = ''2026-10-19''; $week = ''2026-W43''; $month = ''2026-10''; $inventoryOnly = true; require ''' + $viewPath + ''';'
+[IO.File]::WriteAllText($staffRendererPath, $staffPhpRenderer, [Text.UTF8Encoding]::new($false))
+$staffView = (& $PhpPath -f $staffRendererPath | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'Rendering the staff reports view failed.' }
+Set-Content -LiteralPath $staffHtmlPath -Encoding UTF8 -Value ($html.Replace($renderedView, $staffView))
 $socket = New-Object Net.WebSockets.ClientWebSocket
 $browserProcess = $null
 $script:requestId = 0
@@ -334,12 +349,83 @@ try {
     await waitFor(() => $('#report-label').text() === 'Daily sales: 2026-10-19' && !$('#generate-sales-report').prop('disabled'), 'Sales report did not recover after product reports.');
     assert(table.rows().count() === 2 && productTable.rows().count() === 0 && !$('#sales-report-wrapper').prop('hidden')
         && $('#product-report-wrapper').prop('hidden') && $('#report-total').text() === peso + '125.80', 'Switching back must restore only the selected sales report.');
-    assert(!h.errors.length && h.requests.length === 11
-        && h.requests.every(request => ['daily', 'weekly', 'monthly'].includes(request.period) && request.method === 'GET'), 'Unexpected browser error or external request.');
-    return 'Sales/product report checks passed: daily/weekly/monthly periods, aggregates, safe CSV/print totals, picker preservation, and stale/pending result clearing. No download or print dialog opened.';
+    const inventoryTable = $('#inventory-report-table').DataTable();
+    $('#report-type').val('inventory').trigger('change');
+    assert($('#report-period-controls').prop('hidden') && $('#report-period').prop('disabled')
+        && ['#report-date', '#report-week', '#report-month'].every(id => $(id).prop('disabled') && !$(id).prop('required')),
+        'Inventory snapshots must hide and disable all period/date controls.');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => inventoryTable.rows().count() === 3 && !$('#generate-sales-report').prop('disabled'), 'Inventory report did not load.');
+    assert(h.requests[11].path === '/api/Reports/inventory' && h.requests[11].queryKeys.length === 0,
+        'Inventory reports must request the current snapshot without date or period filters.');
+    assert($('#report-label').text() === 'Inventory report: 2026-10-19 12:34:56' && $('#report-count').text() === '3 items'
+        && $('#inventory-low-count').text().includes('2 low stock') && !$('#inventory-low-count').prop('hidden')
+        && $('#report-money-summary').prop('hidden') && $('#report-total').text() === '', 'Inventory summary must show counts and snapshot time without summing mixed units.');
+    assert(!$('#inventory-report-wrapper').prop('hidden') && $('#sales-report-wrapper').prop('hidden')
+        && $('#product-report-wrapper').prop('hidden') && table.rows().count() === 0 && productTable.rows().count() === 0,
+        'Inventory must use its own table and clear financial rows.');
+    assert($('#inventory-report-table tbody').text().includes(h.hostile)
+        && $('#inventory-report-table tbody').text().includes('<b>kg</b>')
+        && !$('#inventory-report-table img, #inventory-report-table b').length && !window.__reportInjected,
+        'Inventory names and units must render as literal text.');
+    const inventoryConfigs = inventoryTable.settings()[0]._buttons[0].inst.s.buttons.map(button => button.conf);
+    const inventoryCsv = inventoryConfigs.find(config => config.className.includes('buttons-csv'));
+    const inventoryPrint = inventoryConfigs.find(config => config.className.includes('buttons-print'));
+    const inventoryData = inventoryTable.buttons.exportData(inventoryCsv.exportOptions);
+    assert(inventoryData.body.length === 3
+        && inventoryData.body.some(row => row[0] === "'=Trace stock" && row[1] === '0.001' && row[2] === "'@kg" && row[3] === '0.010' && row[4] === 'Low stock')
+        && inventoryData.body.some(row => row[0] === 'Zero stock' && row[1] === '0.000' && row[3] === '0.000' && row[4] === 'Low stock'),
+        'Inventory CSV must preserve quantity/minimum precision, status, and formula-safe cells.');
+    assert(inventoryData.footer[0] === 'Inventory report: 2026-10-19 12:34:56'
+        && inventoryData.footer[1] === '' && inventoryData.footer[3] === 'Items: 3' && inventoryData.footer[4] === 'Low stock: 2'
+        && inventoryCsv.filename() === 'inventory-20261019123456', 'Inventory exports must identify snapshot time and counts without a mixed-unit stock total.');
+    const inventoryPrintData = inventoryTable.buttons.exportData(inventoryPrint.exportOptions);
+    assert(inventoryPrintData.body.some(row => row[0].includes('&lt;img') && row[2] === '&lt;b&gt;kg&lt;/b&gt;')
+        && inventoryPrint.title() === 'Inventory report: 2026-10-19 12:34:56'
+        && inventoryPrint.messageTop() === 'Items: 3; Low stock: 2', 'Inventory print output must safely show the complete snapshot and counts.');
+    $('#report-type').val('sales').trigger('change');
+    assert(!$('#report-period').prop('disabled') && !$('#report-date').prop('disabled') && $('#report-date').prop('required'),
+        'Returning to sales must restore the preserved active date picker.');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => table.rows().count() === 2 && !$('#generate-sales-report').prop('disabled'), 'Sales reports did not recover after inventory.');
+    assert(inventoryTable.rows().count() === 0 && $('#inventory-report-wrapper').prop('hidden')
+        && !$('#report-money-summary').prop('hidden') && $('#report-total').text() === peso + '125.80', 'Inventory snapshot data must not persist into a sales report.');
+    assert(!h.errors.length && h.requests.length === 13 && h.requests.every(request => request.method === 'GET'), 'Unexpected browser error or external request.');
+    return 'Owner report checks passed: daily/weekly/monthly sales, product aggregates, inventory snapshots, safe CSV/print exports, picker preservation, and stale/pending clearing. No download or print dialog opened.';
 })()
 '@
     Write-Output (Evaluate-Js $checks)
+    $null = Send-Cdp 'Page.navigate' @{url = ([uri]$staffHtmlPath).AbsoluteUri}
+    $staffReady = $false
+    for ($attempt = 0; $attempt -lt 100; $attempt++) {
+        try {
+            $state = Evaluate-Js '(() => { const h = window.__reportsHarness; return h ? {ready: document.readyState === "complete" && $("#report-type option").length === 1 && $.fn.dataTable.isDataTable("#inventory-report-table") && $("#inventory-report-table").DataTable().rows().count() === 3, errors: h.errors} : null; })()'
+            if ($state -and $state.errors.Count) { throw ('Staff browser errors: ' + ($state.errors -join '; ')) }
+            if ($state -and $state.ready) { $staffReady = $true; break }
+        } catch { if ($_.Exception.Message -like 'Staff browser errors:*' -or $attempt -eq 99) { throw } }
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $staffReady) { throw 'The staff inventory-only report did not load.' }
+    Write-Output (Evaluate-Js @'
+(() => {
+    const h = __reportsHarness;
+    function assert(condition, message) { if (!condition) throw new Error(message); }
+    assert($('#report-type option').length === 1 && $('#report-type').val() === 'inventory'
+        && $('#report-type option').text() === 'Inventory', 'Staff must see only the Inventory report option.');
+    assert($('#report-period-controls').prop('hidden') && $('#report-period').prop('disabled')
+        && ['#report-date', '#report-week', '#report-month'].every(id => $(id).prop('disabled') && !$(id).prop('required')),
+        'Staff inventory reports must not require financial date/period inputs.');
+    assert(h.requests.length === 1 && h.requests[0].path === '/api/Reports/inventory'
+        && h.requests[0].method === 'GET' && h.requests[0].queryKeys.length === 0 && !h.errors.length,
+        'The staff view must make only the inventory snapshot request.');
+    assert($('#inventory-report-table').DataTable().rows().count() === 3
+        && $('#sales-report-table').DataTable().rows().count() === 0
+        && $('#product-report-table').DataTable().rows().count() === 0
+        && $('#sales-report-wrapper').prop('hidden') && $('#product-report-wrapper').prop('hidden')
+        && $('#report-money-summary').prop('hidden') && $('#report-total').text() === '', 'Staff must receive only inventory data and counts.');
+    return 'Staff reports passed: Inventory is the only option; snapshot loads without period/date inputs or financial requests.';
+})()
+'@)
 } finally {
     if ($socket.State -eq [Net.WebSockets.WebSocketState]::Open) { try { $null = Send-Cdp 'Browser.close' } catch { } }
     $socket.Dispose()

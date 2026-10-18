@@ -12,6 +12,7 @@ class ReportsController extends BaseController
         $today = (new \DateTimeImmutable('today', new \DateTimeZone('Asia/Manila')))->format('Y-m-d');
         $week = (new \DateTimeImmutable('today', new \DateTimeZone('Asia/Manila')))->format('o-\WW');
         $month = substr($today, 0, 7);
-        $this->view('Reports/index', ['title'=>'Reports', 'today'=>$today, 'week'=>$week, 'month'=>$month]);
+        $this->view('Reports/index', ['title'=>'Reports', 'today'=>$today, 'week'=>$week, 'month'=>$month,
+            'inventoryOnly'=>(Auth::user()['role'] ?? '') === 'staff']);
     }
 }

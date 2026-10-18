@@ -16,6 +16,15 @@ class ReportsController extends BaseController
         $this->generate('products');
     }
 
+    public function inventory()
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use GET to generate reports.']);
+        }
+        $this->json(['status'=>'success','data'=>(new Reports())->inventory()]);
+    }
+
     private function generate(string $type): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {

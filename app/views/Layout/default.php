@@ -101,6 +101,7 @@
                     <?php elseif ($accountRole === 'cashier'): ?>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/POS" class="nav-link <?= $title === 'POS' ? 'active' : '' ?>"><i class="nav-icon fas fa-file-invoice-dollar"></i><p>POS</p></a></li>
                     <?php elseif ($accountRole === 'staff'): ?>
+                    <li class="nav-item"><a href="<?= BASE_URL ?>/Reports" class="nav-link <?= $title === 'Reports' ? 'active' : '' ?>"><i class="nav-icon fas fa-chart-bar"></i><p>Inventory Report</p></a></li>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/Inventory" class="nav-link <?= $title === 'Inventory' ? 'active' : '' ?>"><i class="nav-icon fas fa-warehouse"></i><p>Inventory</p></a></li>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/Products" class="nav-link <?= $title === 'Products' ? 'active' : '' ?>"><i class="nav-icon fas fa-pizza-slice"></i><p>Products</p></a></li>
                     <?php elseif (in_array($accountRole, ['user', 'loyal_customer'], true) || !$loggedInUser): ?>

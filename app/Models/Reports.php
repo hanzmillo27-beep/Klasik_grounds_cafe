@@ -5,6 +5,16 @@ use Core\Model;
 
 class Reports extends Model
 {
+    public function inventory(): array
+    {
+        $rows = (new Inventory())->find();
+        $generated = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Manila')))->format('Y-m-d H:i:s');
+        $low = 0;
+        foreach ($rows as $row) if ($row->is_low) $low++;
+        return ['report_type'=>'inventory', 'label'=>'Inventory report: ' . $generated,
+            'generated_at'=>$generated, 'rows'=>$rows, 'total_items'=>count($rows), 'low_stock_count'=>$low];
+    }
+
     public function products($period, $value): array
     {
         [$start, $end] = $this->period($period, $value);
