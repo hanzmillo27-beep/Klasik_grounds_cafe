@@ -4,6 +4,7 @@ namespace Models;
 
 use Core\Model;
 use Core\SupabaseStorage;
+use Core\Money;
 
 class Kiosk extends Model
 {
@@ -43,6 +44,7 @@ class Kiosk extends Model
         try {
             $orderItems = [];
             $total = 0;
+            $totalCents = 0;
             $seen = [];
 
             foreach ($items as $item) {
@@ -75,8 +77,9 @@ class Kiosk extends Model
                     throw new \Exception('A product in your cart is no longer available.');
                 }
 
-                $price = (float) $product->product_price;
-                $subtotal = round($price * $quantity, 2);
+                $price = Money::cents($product->product_price) / 100;
+                $subtotalCents = Money::cents($price) * $quantity;
+                $subtotal = $subtotalCents / 100;
 
                 $orderItems[] = [
                     'product_id' => $product->product_id,
@@ -86,8 +89,10 @@ class Kiosk extends Model
                     'subtotal' => $subtotal
                 ];
 
-                $total += $subtotal;
+                $totalCents += $subtotalCents;
+                if ($totalCents > 9999999999) throw new \Exception('Order total exceeds the supported amount.');
             }
+            $total = $totalCents / 100;
 
             $reference = 'KG-' . strtoupper(bin2hex(random_bytes(4)));
 

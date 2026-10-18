@@ -25,7 +25,7 @@ The earlier audit is retained as the historical baseline.
 | FR-017 | Complete | `php tests/fr_017.php`; multiple products, integer quantities, duplicate/invalid item rejection |
 | FR-018 | Complete | `php tests/fr_018.php`; edited POS/kiosk quantities saved; original kiosk prices retained, new items priced by server |
 | FR-019 | Complete | `php tests/fr_019.php` on SQLite/PostgreSQL; `tests/browser-pos.ps1` on Edge; item removal, reload, historical prices and guarded cart edits |
-| FR-020 | Pending | |
+| FR-020 | Complete | `php tests/fr_020.php`; integer-cent calculations, trusted prices, displayed-total check, price-refresh UI |
 | FR-021 | Pending | |
 | FR-022 | Pending | |
 | FR-023 | Pending | |

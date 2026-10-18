@@ -145,6 +145,15 @@ $(document).ready(function () {
             })
                 .done((res) => {
                     products = res.data || [];
+                    cart.forEach(function (item) {
+                        const original = kioskOrderId !== null && originalKioskItems.find(x => Number(x.product_id) === Number(item.product_id));
+                        const current = products.find(x => Number(x.product_id) === Number(item.product_id));
+                        item.unavailable = !current;
+                        if (original) { item.product_name = original.product_name; item.product_price = Number(original.unit_price); }
+                        else if (current) { item.product_name = current.product_name; item.product_price = Number(current.product_price); }
+                    });
+                    saveCart();
+                    renderCart();
                     renderProducts(products);
                 })
                 .fail((xhr) => {
@@ -350,12 +359,13 @@ $(document).ready(function () {
             const total = cart.reduce(
                 (sum, item) =>
                     sum +
-                    Number(item.product_price) *
+                    Math.round(Number(item.product_price) * 100) *
                     Number(item.quantity),
                 0
             );
 
-            $(s.cartTotal).text(formatMoney(total));
+            $(s.cartTotal).text(formatMoney(total / 100));
+            return total / 100;
         }
 
         function handleIncrease(e) {
@@ -508,6 +518,10 @@ $(document).ready(function () {
         function handleCheckout(e) {
             e.preventDefault();
             if (loadingKiosk || checkingOut) return;
+            if (cart.some(item => item.unavailable)) {
+                msgBox('error', 'Remove unavailable products from this order before checkout.');
+                return;
+            }
 
             console.log('Checkout button clicked');
 
@@ -526,6 +540,7 @@ $(document).ready(function () {
                     : '';
 
                 fd.append('customer_name', customerName);
+            fd.append('expected_total', updateTotal().toFixed(2));
 
             fd.append(
                 'items',
@@ -556,6 +571,7 @@ $(document).ready(function () {
                     const status = res.status || res.result;
 
                     msgBox(status, res.message);
+                    if (res.code === 'review_prices') loadProducts();
 
                     if (status === 'success') {
 

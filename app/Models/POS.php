@@ -5,6 +5,7 @@ namespace Models;
 use Core\Model;
 use Core\Auth;
 use Core\SupabaseStorage;
+use Core\Money;
 
 class POS extends Model
 {
@@ -256,6 +257,7 @@ class POS extends Model
 
             $items = [];
             $total = 0;
+            $totalCents = 0;
             $seen = [];
 
             foreach ($data['items'] as $item) {
@@ -312,17 +314,16 @@ class POS extends Model
                 }
                 if ($savedItem) {
                     $productName = $savedItem->product_name;
-                    $unitPrice = (float) $savedItem->unit_price;
+                    $unitPrice = $savedItem->unit_price;
                 } else {
                     $productName = $product->product_name;
-                    $unitPrice = (float) $product->product_price;
+                    $unitPrice = $product->product_price;
                 }
 
-                if ($unitPrice < 0) {
-                    throw new \Exception('Invalid product price.');
-                }
-
-                $subtotal = round($unitPrice * $quantity, 2);
+                $unitCents = Money::cents($unitPrice);
+                $unitPrice = $unitCents / 100;
+                $subtotalCents = $unitCents * $quantity;
+                $subtotal = $subtotalCents / 100;
 
                 $items[] = [
                     'product_id' => $productId,
@@ -332,10 +333,14 @@ class POS extends Model
                     'subtotal' => $subtotal
                 ];
 
-                $total += $subtotal;
+                $totalCents += $subtotalCents;
+                if ($totalCents > 9999999999) throw new \Exception('Order total exceeds the supported amount.');
             }
 
-            $total = round($total, 2);
+            $total = $totalCents / 100;
+            if (isset($data['expected_total']) && Money::cents($data['expected_total']) !== $totalCents) {
+                throw new \Exception('Order total changed. Review the current prices before checkout.');
+            }
 
             /*
              * Check all required ingredients before creating the sale.

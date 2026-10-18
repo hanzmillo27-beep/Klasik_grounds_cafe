@@ -59,7 +59,9 @@ window.__posHarness = {
     products: [
         {product_id: 1, product_name: 'Current Americano', product_price: 999, category_name: 'Coffee'},
         {product_id: 2, product_name: 'Current Latte', product_price: 160, category_name: 'Coffee'},
-        {product_id: 3, product_name: 'Cookie', product_price: 50, category_name: 'Food'}
+        {product_id: 3, product_name: 'Cookie', product_price: 50, category_name: 'Food'},
+        {product_id: 4, product_name: 'Fraction A', product_price: 0.10, category_name: 'Test fractions'},
+        {product_id: 5, product_name: 'Fraction B', product_price: 0.20, category_name: 'Test fractions'}
     ],
     order: {
         kiosk_order_id: 42, reference_code: 'KG-BROWSER', status: 'claimed',
@@ -147,7 +149,7 @@ function Evaluate-Js([string]$expression) {
 function Wait-PosReady([string]$previousGeneration = '') {
     for ($attempt = 0; $attempt -lt 100; $attempt++) {
         try {
-            $state = Evaluate-Js '(() => { const h = window.__posHarness; return h ? {generation: h.generation, ready: document.readyState === "complete" && document.querySelectorAll(".btn-add-product").length === 3, errors: h.errors} : null; })()'
+            $state = Evaluate-Js '(() => { const h = window.__posHarness; return h ? {generation: h.generation, ready: document.readyState === "complete" && document.querySelectorAll(".btn-add-product").length === h.products.length, errors: h.errors} : null; })()'
             if ($state -and $state.errors.Count) { throw ('POS browser errors: ' + ($state.errors -join '; ')) }
             if ($state -and $state.ready -and $state.generation -ne $previousGeneration) { return $state.generation }
         } catch {
@@ -180,6 +182,7 @@ function assertCart(expected, total) {
     assert(document.querySelectorAll('#cart-list .btn-remove').length === expected.length, 'Visible cart does not match persisted cart.');
     const displayed = Number(document.querySelector('#cart-total').textContent.replace(/[^0-9.-]/g, ''));
     assert(Math.abs(displayed - total) < 0.001, 'Displayed total differs: ' + displayed + ' versus ' + total);
+    assert(document.querySelector('#cart-total').textContent.endsWith(total.toFixed(2)), 'Total must display exactly two decimal places.');
 }
 function assertOffline() {
     assert(!h.errors.length, 'Browser errors: ' + h.errors.join('; '));
@@ -206,6 +209,21 @@ try {
     $null = Send-Cdp 'Page.navigate' @{url = ([uri]$htmlPath).AbsoluteUri}
     $generation = Wait-PosReady
     $phaseOne = @'
+assertCart([], 0);
+click('.btn-add-product[data-id="4"]');
+click('.btn-increase[data-id="4"]');
+click('.btn-increase[data-id="4"]');
+click('.btn-add-product[data-id="5"]');
+assertCart([[4, 3, 0.10], [5, 1, 0.20]], 0.50);
+click('.btn-increase[data-id="5"]');
+click('.btn-increase[data-id="5"]');
+assertCart([[4, 3, 0.10], [5, 3, 0.20]], 0.90);
+click('.btn-decrease[data-id="4"]');
+click('.btn-decrease[data-id="4"]');
+assertCart([[4, 1, 0.10], [5, 3, 0.20]], 0.70);
+click('.btn-remove[data-id="4"]');
+assertCart([[5, 3, 0.20]], 0.60);
+click('.btn-remove[data-id="5"]');
 assertCart([], 0);
 click('.btn-add-product[data-id="1"]');
 click('.btn-increase[data-id="1"]');
@@ -248,7 +266,7 @@ click('.btn-add-product[data-id="1"]');
 assertCart([[1, 1, 125.5]], 125.5);
 $('#customer_name').val('Edited kiosk customer').trigger('input');
 assertOffline();
-return 'Normal and kiosk add, quantity, individual removal, last-item removal, historical re-add, and pending-claim protection passed.';
+return 'Decimal-price totals, normal and kiosk add, quantity, individual removal, last-item removal, historical re-add, and pending-claim protection passed.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $phaseOne + '})()'))
     $null = Send-Cdp 'Page.reload' @{ignoreCache = $true}

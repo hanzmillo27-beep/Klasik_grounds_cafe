@@ -95,7 +95,8 @@ class POSController extends BaseController
         try {
             $result = $this->POS->checkout($data);
         } catch (\Throwable $e) {
-            $this->json(['status'=>'error','message'=>$e->getMessage()]);
+            $this->json(['status'=>'error','message'=>$e->getMessage(),
+                'code'=>strpos($e->getMessage(), 'Order total changed.') === 0 ? 'review_prices' : null]);
             return;
         }
         $message = 'Sale completed successfully.';
