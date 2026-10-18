@@ -17,14 +17,25 @@ class Reports extends Model
         $rows = $stmt->fetchAll();
         $totalCents = 0;
         foreach ($rows as $row) $totalCents += (int) round((float) $row->total_amount * 100);
+        $endDate = $end->modify('-1 day')->format('Y-m-d');
         return ['period'=>$period, 'start_date'=>$start->format('Y-m-d'),
             'end_date'=>$end->modify('-1 day')->format('Y-m-d'),
-            'label'=>'Daily sales: ' . $start->format('Y-m-d'), 'rows'=>$rows,
+            'label'=>ucfirst($period) . ' sales: ' . $start->format('Y-m-d') . ($period === 'daily' ? '' : ' to ' . $endDate), 'rows'=>$rows,
             'transaction_count'=>count($rows), 'total_amount'=>$totalCents / 100];
     }
 
     private function period($period, $value): array
     {
+        if ($period === 'weekly') {
+            if (!is_string($value) || !preg_match('/^(\d{4})-W(\d{2})$/D', $value, $match)
+                || (int) $match[1] < 1001 || (int) $match[1] > 9997) {
+                throw new \InvalidArgumentException('Choose a valid ISO report week.');
+            }
+            $start = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Manila')))
+                ->setISODate((int) $match[1], (int) $match[2])->setTime(0, 0);
+            if ($start->format('o-\WW') !== $value) throw new \InvalidArgumentException('Choose a valid ISO report week.');
+            return [$start, $start->modify('+1 week')];
+        }
         if ($period !== 'daily' || !is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value)) {
             throw new \InvalidArgumentException('Choose a valid report date.');
         }

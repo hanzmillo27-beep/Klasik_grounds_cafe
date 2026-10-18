@@ -1,12 +1,23 @@
 <div class="card card-primary card-outline">
     <div class="card-header">
-        <h3 class="card-title">Daily Sales Report</h3>
+        <h3 class="card-title">Sales Reports</h3>
     </div>
     <div class="card-body">
         <form id="sales-report-form" class="form-inline mb-3">
-            <label for="report-date" class="mr-2">Sales date</label>
-            <input type="date" id="report-date" name="date" class="form-control mr-sm-2 mb-2 mb-sm-0" min="1000-01-01" max="9998-12-31"
-                value="<?= htmlspecialchars($today, ENT_QUOTES, 'UTF-8') ?>" required>
+            <label for="report-period" class="mr-2">Period</label>
+            <select id="report-period" class="form-control mr-sm-3 mb-2 mb-sm-0">
+                <option value="daily">Daily</option><option value="weekly">Weekly</option>
+            </select>
+            <span id="report-date-field" class="form-inline">
+                <label for="report-date" class="mr-2">Sales date</label>
+                <input type="date" id="report-date" name="date" class="form-control mr-sm-2 mb-2 mb-sm-0" min="1000-01-01" max="9998-12-31"
+                    value="<?= htmlspecialchars($today, ENT_QUOTES, 'UTF-8') ?>" required>
+            </span>
+            <span id="report-week-field" class="form-inline" hidden>
+                <label for="report-week" class="mr-2">Sales week</label>
+                <input type="week" id="report-week" class="form-control mr-sm-2 mb-2 mb-sm-0"
+                    value="<?= htmlspecialchars($week, ENT_QUOTES, 'UTF-8') ?>" disabled>
+            </span>
             <button type="submit" id="generate-sales-report" class="btn btn-primary">Generate report</button>
         </form>
         <p id="report-message" class="text-muted" role="status" aria-live="polite"></p>

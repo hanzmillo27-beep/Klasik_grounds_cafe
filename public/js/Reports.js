@@ -38,7 +38,7 @@ $(document).ready(function () {
     const table = $('#sales-report-table').DataTable({
         data: [], autoWidth: false, searching: false, pageLength: 25,
         order: [[1, 'asc'], [0, 'asc']], dom: 'Brtip',
-        language: {emptyTable: 'No completed transactions for this date.'},
+        language: {emptyTable: 'No completed transactions for this period.'},
         columns: [
             {data: 'sale_id', render: renderText},
             {data: 'sale_date', render: renderText},
@@ -50,10 +50,13 @@ $(document).ready(function () {
         ],
         buttons: [
             {extend: 'csvHtml5', text: 'Export CSV', footer: true, bom: true,
-                filename: function () { return report ? 'daily-sales-' + report.start_date : 'daily-sales'; },
+                filename: function () {
+                    return report ? report.period + '-sales-' + report.start_date
+                        + (report.period === 'weekly' ? '-to-' + report.end_date : '') : 'sales-report';
+                },
                 exportOptions: exportOptions(false)},
             {extend: 'print', text: 'Print report', footer: true,
-                title: function () { return report ? escapeHtml(report.label) : 'Daily sales'; },
+                title: function () { return report ? escapeHtml(report.label) : 'Sales report'; },
                 messageTop: function () { return report ? 'Transactions: ' + Number(report.transaction_count) : ''; },
                 exportOptions: exportOptions(true)}
         ]
@@ -77,16 +80,17 @@ $(document).ready(function () {
         if (request && request.abort) request.abort();
         clearReport();
         $('#report-error').text('').prop('hidden', true);
-        const date = $('#report-date').val();
+        const period = $('#report-period').val();
+        const date = $(period === 'weekly' ? '#report-week' : '#report-date').val();
         if (!date || !$('#sales-report-form')[0].checkValidity()) {
-            showError('Choose a valid report date.');
+            showError(period === 'weekly' ? 'Choose a valid report week.' : 'Choose a valid report date.');
             $('#generate-sales-report').prop('disabled', false);
             return;
         }
         $('#report-message').text('Loading sales report...');
         $('#generate-sales-report').prop('disabled', true);
         request = $.ajax({url: `${base_url}/api/Reports/sales`, type: 'GET', dataType: 'json',
-            data: {period: 'daily', date: date}})
+            data: {period: period, date: date}})
             .done(function (response) {
                 if (number !== requestNumber) return;
                 if (response.status !== 'success' || !response.data || !Array.isArray(response.data.rows)) {
@@ -99,7 +103,7 @@ $(document).ready(function () {
                 $('#report-count').text(Number(report.transaction_count) + (Number(report.transaction_count) === 1 ? ' transaction' : ' transactions'));
                 $('#report-total, #report-footer-total').text(money(report.total_amount));
                 $('#sales-report-results').prop('hidden', false);
-                $('#report-message').text(report.rows.length ? '' : 'No completed transactions for this date.');
+                $('#report-message').text(report.rows.length ? '' : 'No completed transactions for this period.');
                 table.buttons().enable();
                 table.columns.adjust();
             })
@@ -113,6 +117,15 @@ $(document).ready(function () {
                 $('#generate-sales-report').prop('disabled', false);
             });
     }
+    function updatePeriodFields() {
+        const weekly = $('#report-period').val() === 'weekly';
+        $('#report-date').prop('disabled', weekly).prop('required', !weekly);
+        $('#report-week').prop('disabled', !weekly).prop('required', weekly);
+        $('#report-date-field').prop('hidden', weekly);
+        $('#report-week-field').prop('hidden', !weekly);
+    }
+    $('#report-period').on('change', updatePeriodFields);
     $('#sales-report-form').on('submit', function (event) { event.preventDefault(); loadReport(); });
+    updatePeriodFields();
     loadReport();
 });
