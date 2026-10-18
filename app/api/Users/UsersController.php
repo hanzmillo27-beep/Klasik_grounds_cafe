@@ -32,6 +32,20 @@ class UsersController extends BaseController
             $this->json(['status'=>'error', 'message'=>'Use the edit action to update an existing account.']);
         }
         $this->guardOwnerRole($data['role'] ?? '');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to create an account.']);
+        }
+        if (!is_string($data['username'] ?? null) || !is_string($data['password'] ?? null)) {
+            $this->json(['status'=>'error','message'=>'Enter a valid username and password.']);
+        }
+        $data['username'] = trim($data['username']);
+        if (strlen($data['username']) > 100 || strlen($data['password']) < 4 || strlen($data['password']) > 72) {
+            $this->json(['status'=>'error','message'=>'Use a username up to 100 characters and a password of 4 to 72 characters.']);
+        }
+        if ($this->Users->usernameExists($data['username'])) {
+            $this->json(['status'=>'error','message'=>'Username is already taken.']);
+        }
 
         if (empty($data['username'])) {
             $this->json([
@@ -61,7 +75,13 @@ class UsersController extends BaseController
             ]);
         }
 
-        if ($this->Users->save($data)) {
+        try { $saved = $this->Users->save($data); }
+        catch (\PDOException $error) {
+            $duplicate = in_array((string) $error->getCode(), ['23000','23505'], true);
+            http_response_code($duplicate ? 409 : 500);
+            $this->json(['status'=>'error','message'=>$duplicate ? 'Username is already taken.' : 'Unable to save user.']);
+        }
+        if ($saved) {
             $this->json([
                 'status' => 'success',
                 'message' => empty($data['id'])
