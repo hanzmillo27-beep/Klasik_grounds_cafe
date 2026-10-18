@@ -9,7 +9,7 @@ try {
     if (!preg_match('/^\d{3}_[a-z_]+\.sql$/', $name)) throw new RuntimeException('Specify a migration filename.');
     $path = dirname(__DIR__) . '/migrations/' . $name;
     if (!is_file($path)) throw new RuntimeException('Migration file not found.');
-    $db = new PDO('pgsql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';sslmode=require', DB_USER, DB_PASS, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+    $db = new PDO('pgsql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';sslmode=require', DB_USER, DB_PASS, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_EMULATE_PREPARES=>true]);
     if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') throw new RuntimeException('These migrations require PostgreSQL.');
     $db->beginTransaction();
     $db->exec('CREATE TABLE IF NOT EXISTS app_migrations (name VARCHAR(100) PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)');

@@ -517,10 +517,7 @@ $(document).on(
                         response.status === 'success'
                     ) {
 
-                        msgBox(
-                            response.message,
-                            'success'
-                        );
+                        msgBox('success', response.message);
 
                         $('#products-table')
                             .DataTable()
@@ -531,11 +528,8 @@ $(document).on(
 
                     } else {
 
-                        msgBox(
-                            response.message ||
-                            'Unable to delete product.',
-                            'error'
-                        );
+                        msgBox('error', response.message ||
+                            'Unable to delete product.');
                     }
                 },
 
@@ -609,10 +603,7 @@ $(document).on(
 
             if (!valid) {
 
-                msgBox(
-                    'Please select an inventory item from the search results and enter a valid quantity.',
-                    'error'
-                );
+                msgBox('error', 'Please select an inventory item from the search results and enter a valid quantity.');
 
                 return;
             }
@@ -659,10 +650,7 @@ $(document).on(
                         response.status === 'success'
                     ) {
 
-                        msgBox(
-                            response.message,
-                            'success'
-                        );
+                        msgBox('success', response.message);
 
                         $('#product-modal')
                             .modal('hide');
@@ -674,11 +662,8 @@ $(document).on(
 
                     } else {
 
-                        msgBox(
-                            response.message ||
-                            'Request failed.',
-                            'error'
-                        );
+                        msgBox('error', response.message ||
+                            'Request failed.');
                     }
                 },
 
@@ -716,10 +701,7 @@ $(document).on(
                             xhr.responseText;
                     }
 
-                    msgBox(
-                        message,
-                        'error'
-                    );
+                    msgBox('error', message);
                 },
 
                 complete: function () {

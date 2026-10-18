@@ -39,6 +39,12 @@ class ProductsController extends BaseController
     public function add()
     {
         $data = $_POST;
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to save products.']);
+        }
+        $error = $this->Products->validationError($data);
+        if ($error !== null) $this->json(['status'=>'error','message'=>$error]);
 
         if (empty($data['product_name'])) {
             $this->json([

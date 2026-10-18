@@ -103,6 +103,9 @@ class Products extends Model
 
     public function save($data)
     {
+        if ($this->validationError($data) !== null) return false;
+        $data['product_name'] = trim($data['product_name']);
+        $data['product_price'] = round((float) $data['product_price'], 2);
         try {
 
             $this->db->beginTransaction();
@@ -192,7 +195,7 @@ class Products extends Model
                     $ingredientName = trim($ingredientName);
 
                     if ($ingredientName === '') {
-                        continue;
+                        throw new \InvalidArgumentException('Ingredient name is required.');
                     }
 
                     $quantity =
@@ -203,7 +206,7 @@ class Products extends Model
                         !is_numeric($quantity) ||
                         $quantity <= 0
                     ) {
-                        continue;
+                        throw new \InvalidArgumentException('Ingredient quantity must be positive.');
                     }
 
                     $findInventory->execute([
@@ -241,6 +244,31 @@ class Products extends Model
 
             return false;
         }
+    }
+
+    public function validationError(array $data): ?string
+    {
+        if (!is_string($data['product_name'] ?? null) || trim($data['product_name']) === '' || strlen($data['product_name']) > 150) return 'Enter a product name of up to 150 characters.';
+        $price = $data['product_price'] ?? null;
+        if (!is_numeric($price) || !is_finite((float) $price) || $price < 0 || $price > 99999999.99) return 'Enter a valid nonnegative product price.';
+        $category = filter_var($data['category_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$category || $category < 1) return 'Choose an existing category.';
+        $stmt = $this->db->prepare('SELECT category_id FROM categories WHERE category_id = ?');
+        $stmt->execute([$category]);
+        if (!$stmt->fetch()) return 'Choose an existing category.';
+        $names = $data['ingredient_name'] ?? [];
+        $quantities = $data['ingredient_quantity'] ?? [];
+        if (!is_array($names) || !is_array($quantities)) return 'Enter valid ingredient rows.';
+        $seen = [];
+        foreach ($names as $index=>$name) {
+            if (!is_string($name) || trim($name) === '') return 'Choose an inventory item for each ingredient.';
+            $quantity = $quantities[$index] ?? null;
+            if (!is_numeric($quantity) || !is_finite((float) $quantity) || $quantity <= 0) return 'Ingredient quantities must be positive.';
+            $name = strtolower(trim($name));
+            if (isset($seen[$name])) return 'Use each ingredient only once.';
+            $seen[$name] = true;
+        }
+        return null;
     }
 
     public function delete($id): bool

@@ -187,13 +187,6 @@
 
             <div class="modal-footer">
 
-                <input
-                    type="number"
-                    name="ingredient_quantity[]"
-                    id="ingredient_quantity"
-                    class="form-control"
-                >
-
                 <button
                     type="button"
                     class="btn btn-secondary"

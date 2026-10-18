@@ -16,7 +16,7 @@ The earlier audit is retained as the historical baseline.
 | FR-008 | Complete | `php tests/fr_008.php`; migration `008_user_status.sql`; deactivate/reactivate |
 | FR-009 | Complete | `php tests/fr_009.php`; shared role list and PostgreSQL role constraint |
 | FR-010 | Complete | `php tests/fr_010.php`; safe active/inactive user list |
-| FR-011 | Pending | |
+| FR-011 | Complete | `php tests/fr_011.php`; SQLite and isolated PostgreSQL product/recipe tests |
 | FR-012 | Pending | |
 | FR-013 | Pending | |
 | FR-014 | Pending | |
