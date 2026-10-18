@@ -164,6 +164,10 @@ class POS extends Model
     public function checkout($data)
     {
         try {
+            $checkoutKey = $data['checkout_key'] ?? null;
+            if ($checkoutKey !== null && (!is_string($checkoutKey) || !preg_match('/^[a-zA-Z0-9_-]{8,80}$/D', $checkoutKey))) {
+                throw new \Exception('Invalid order checkout key.');
+            }
             $kioskOrderId = isset($data['kiosk_order_id'])
                 && $data['kiosk_order_id'] !== ''
                 ? filter_var($data['kiosk_order_id'], FILTER_VALIDATE_INT)
@@ -172,6 +176,7 @@ class POS extends Model
             if (!is_string($data['customer_name'] ?? '') || strlen(trim($data['customer_name'] ?? '')) > 100) {
                 throw new \Exception('Customer name must be at most 100 characters.');
             }
+            $fingerprint = $checkoutKey === null ? null : $this->checkoutFingerprint($data, $kioskOrderId);
 
             $userId = Auth::user()['id'] ?? null;
 
@@ -180,6 +185,10 @@ class POS extends Model
             }
 
             $this->db->beginTransaction();
+            if ($checkoutKey !== null && ($completed = $this->completedCheckout($checkoutKey, $userId, $fingerprint))) {
+                $this->db->commit();
+                return $completed;
+            }
 
             $kioskOrder = null;
 
@@ -409,9 +418,12 @@ class POS extends Model
                     total_amount,
                     amount_paid,
                     change_amount,
+                    checkout_key,
+                    checkout_payload_hash,
                     sale_date
                 )
-                VALUES (?, ?, ?, ?, ?, ?)';
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (checkout_key) DO NOTHING';
             $stmt = $this->db->prepare($saleInsertSql);
 
             $stmt->execute([
@@ -420,8 +432,16 @@ class POS extends Model
                 $total,
                 $amountPaid,
                 $changeAmount,
+                $checkoutKey,
+                $fingerprint,
                 date('Y-m-d H:i:s')
             ]);
+            if ($stmt->rowCount() !== 1) {
+                $this->db->rollBack();
+                $completed = $this->completedCheckout($checkoutKey, $userId, $fingerprint);
+                if (!$completed) throw new \Exception('Unable to recover the completed order.');
+                return $completed;
+            }
 
             $saleId = (int) $this->db->lastInsertId();
 
@@ -525,17 +545,17 @@ class POS extends Model
 
             if ($customerUserId > 0) {
                 $pointDate = date('Y-m-d');
-                $earningInsertSql = 'INSERT IGNORE INTO loyalty_earnings
+                $earningInsertSql = 'INSERT INTO loyalty_earnings
                     (user_id, sale_id, point_date)
-                    VALUES (?, ?, ?)';
+                    VALUES (?, ?, ?) ON CONFLICT (user_id, point_date) DO NOTHING';
                 $stmt = $this->db->prepare($earningInsertSql);
                 $stmt->execute([$customerUserId, $saleId, $pointDate]);
 
                 if ($stmt->rowCount() === 1) {
                     $loyaltyInsertSql = 'INSERT INTO loyal (user_id, loyalty_points)
                         VALUES (?, 1)
-                        ON DUPLICATE KEY UPDATE
-                        loyalty_points = loyalty_points + 1';
+                        ON CONFLICT (user_id) DO UPDATE SET
+                        loyalty_points = loyal.loyalty_points + 1';
                     $stmt = $this->db->prepare($loyaltyInsertSql);
                     $stmt->execute([$customerUserId]);
                     $loyaltyPointEarned = true;
@@ -558,9 +578,45 @@ class POS extends Model
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
-
+            if (isset($checkoutKey, $fingerprint, $userId)) {
+                $completed = $this->completedCheckout($checkoutKey, $userId, $fingerprint);
+                if ($completed) return $completed;
+            }
             throw $e;
         }
+    }
+
+    private function checkoutFingerprint(array $data, ?int $kioskId): string
+    {
+        $rows = $data['items'] ?? null;
+        if (!is_array($rows) || !$rows || count($rows) > 100) throw new \Exception('Cart is empty or invalid.');
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) throw new \Exception('Invalid cart item.');
+            $id = filter_var($row['product_id'] ?? null, FILTER_VALIDATE_INT);
+            $quantity = filter_var($row['quantity'] ?? null, FILTER_VALIDATE_INT);
+            if (!$id || $id < 1 || !$quantity || $quantity < 1 || $quantity > 99 || isset($items[$id])) throw new \Exception('Invalid cart item.');
+            $items[$id] = $quantity;
+        }
+        ksort($items);
+        return hash('sha256', json_encode([$items, trim($data['customer_name'] ?? ''),
+            Money::paymentCents($data['amount_paid'] ?? null), $kioskId,
+            isset($data['expected_total']) ? Money::cents($data['expected_total']) : null]));
+    }
+
+    private function completedCheckout(string $key, int $userId, string $fingerprint): ?array
+    {
+        $stmt = $this->db->prepare('SELECT sale_id, user_id, total_amount, amount_paid, change_amount, checkout_payload_hash FROM sales WHERE checkout_key = ?');
+        $stmt->execute([$key]);
+        $sale = $stmt->fetch();
+        if (!$sale) return null;
+        if ((int) $sale->user_id !== $userId) throw new \Exception('This order was completed by another cashier.');
+        if (!hash_equals($sale->checkout_payload_hash ?? '', $fingerprint)) {
+            throw new \Exception('This order was already paid with different details. Open transaction #' . $sale->sale_id . ' before starting a new order.');
+        }
+        return ['sale_id'=>(int) $sale->sale_id, 'total_amount'=>(float) $sale->total_amount,
+            'amount_paid'=>(float) $sale->amount_paid, 'change_amount'=>(float) $sale->change_amount,
+            'kiosk_order_id'=>null, 'loyalty_customer'=>false, 'loyalty_point_earned'=>false, 'replayed'=>true];
     }
 }
 

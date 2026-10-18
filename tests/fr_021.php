@@ -4,7 +4,7 @@ require __DIR__ . '/pos_fixture.php';
 $items = [['product_id' => 1, 'quantity' => 1]];
 foreach (['125.50', '200.00'] as $paid) {
     $_SERVER['REQUEST_METHOD'] = 'POST';
-    $_POST = ['items' => json_encode($items), 'amount_paid' => $paid];
+    $_POST = ['items' => json_encode($items), 'amount_paid' => $paid, 'checkout_key' => checkoutTestKey()];
     try {
         (new TestPOSController())->checkout();
         throw new LogicException('Payment checkout must return JSON.');

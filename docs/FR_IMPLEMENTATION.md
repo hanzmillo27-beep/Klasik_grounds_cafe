@@ -28,7 +28,7 @@ The earlier audit is retained as the historical baseline.
 | FR-020 | Complete | `php tests/fr_020.php`; integer-cent calculations, trusted prices, displayed-total check, price-refresh UI |
 | FR-021 | Complete | `php tests/fr_021.php`; required validated cash tender, persisted payment, no sale/stock change for insufficient payment |
 | FR-022 | Complete | `php tests/fr_022.php`; trusted saved change, exact/overpayment and live jQuery change preview |
-| FR-023 | Pending | |
+| FR-023 | Complete | `php tests/fr_023.php`; paid atomic checkout/rollback, retry deduplication, PostgreSQL-compatible loyalty updates |
 | FR-024 | Pending | |
 | FR-025 | Pending | |
 | FR-026 | Pending | |

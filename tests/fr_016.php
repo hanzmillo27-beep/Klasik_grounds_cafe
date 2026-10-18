@@ -3,7 +3,7 @@ require __DIR__ . '/pos_fixture.php';
 
 function checkoutRequest(array $payload, string $method = 'POST'): array {
     $_SERVER['REQUEST_METHOD'] = $method;
-    $_POST = $payload + ['amount_paid' => '1000.00'];
+    $_POST = $payload + ['amount_paid' => '1000.00', 'checkout_key' => checkoutTestKey()];
     http_response_code(200);
     try {
         (new TestPOSController())->checkout();

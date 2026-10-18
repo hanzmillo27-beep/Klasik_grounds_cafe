@@ -73,6 +73,9 @@ class POSController extends BaseController
             $this->json(['status'=>'error','message'=>'Use POST to checkout.']);
         }
         $data = $_POST;
+        if (!is_string($data['checkout_key'] ?? null) || !preg_match('/^[a-zA-Z0-9_-]{8,80}$/D', $data['checkout_key'])) {
+            $this->json(['status'=>'error','message'=>'Start a new order before checkout.']);
+        }
 
         if (empty($data['items'])) {
             $this->json([
@@ -100,6 +103,7 @@ class POSController extends BaseController
             return;
         }
         $message = 'Sale completed successfully.';
+        if (!empty($result['replayed'])) $message = 'This payment was already recorded. Showing the saved transaction.';
         if ($result['loyalty_point_earned']) $message .= ' 1 loyalty point was added.';
         elseif ($result['loyalty_customer']) $message .= ' The daily loyalty point has already been earned.';
         $this->json([

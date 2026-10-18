@@ -8,7 +8,7 @@ $pos = new Models\POS();
 foreach ([[1, 1, '125.50', 12550, 0], [1, 1, '200.00', 12550, 7450], [2, 3, '1.00', 30, 70]] as [$id, $quantity, $paid, $totalCents, $changeCents]) {
     $_SERVER['REQUEST_METHOD'] = 'POST';
     $_POST = ['items' => json_encode([['product_id' => $id, 'quantity' => $quantity]]),
-        'amount_paid' => $paid, 'change_amount' => '99999999.99'];
+        'amount_paid' => $paid, 'change_amount' => '99999999.99', 'checkout_key' => checkoutTestKey()];
     try {
         (new TestPOSController())->checkout();
         throw new LogicException('Checkout must return JSON.');

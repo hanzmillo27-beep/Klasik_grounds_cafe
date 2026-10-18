@@ -30,6 +30,17 @@ $(document).ready(function () {
         let originalKioskItems = [];
         let loadingKiosk = false;
         let checkingOut = false;
+        let checkoutKey = localStorage.getItem('pos_checkout_key') || newCheckoutKey();
+        localStorage.setItem('pos_checkout_key', checkoutKey);
+
+        function newCheckoutKey() {
+            return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        }
+
+        function resetCheckoutKey() {
+            checkoutKey = newCheckoutKey();
+            localStorage.setItem('pos_checkout_key', checkoutKey);
+        }
 
         function init() {
             loadSavedCart();
@@ -436,6 +447,7 @@ $(document).ready(function () {
             if (loadingKiosk || checkingOut) return;
 
             function newOrder() {
+                resetCheckoutKey();
                 cart = [];
                 kioskOrderId = null;
                 clearSavedCart();
@@ -554,6 +566,7 @@ $(document).ready(function () {
 
                 fd.append('customer_name', customerName);
             fd.append('amount_paid', amountPaid);
+            fd.append('checkout_key', checkoutKey);
             fd.append('expected_total', updateTotal().toFixed(2));
 
             fd.append(
@@ -589,6 +602,7 @@ $(document).ready(function () {
                     if (res.code === 'review_prices') loadProducts();
 
                     if (status === 'success') {
+                        resetCheckoutKey();
 
                         cart = [];
 
