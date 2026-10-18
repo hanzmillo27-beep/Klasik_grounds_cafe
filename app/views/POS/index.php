@@ -112,6 +112,9 @@
                     <input type="number" id="amount_paid" class="form-control" min="0" max="99999999.99"
                         step="0.01" placeholder="0.00" autocomplete="off" required>
                 </div>
+                <div class="d-flex justify-content-between" aria-live="polite">
+                    <strong>Change</strong><strong id="payment-change">—</strong>
+                </div>
 
             </div>
 

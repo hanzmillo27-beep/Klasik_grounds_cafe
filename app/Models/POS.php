@@ -85,6 +85,7 @@ class POS extends Model
                 s.customer_name,
                 s.total_amount,
                 s.amount_paid,
+                s.change_amount,
                 s.sale_date,
                 u.username AS user_name,
                 COUNT(si.sale_item_id) AS item_count
@@ -99,6 +100,7 @@ class POS extends Model
                 s.customer_name,
                 s.total_amount,
                 s.amount_paid,
+                s.change_amount,
                 s.sale_date,
                 u.username
              ORDER BY s.sale_date DESC, s.sale_id DESC'
@@ -116,6 +118,7 @@ class POS extends Model
                 s.customer_name,
                 s.total_amount,
                 s.amount_paid,
+                s.change_amount,
                 s.sale_date,
                 u.username AS user_name
              FROM sales s
@@ -347,6 +350,7 @@ class POS extends Model
             $paidCents = Money::paymentCents($data['amount_paid'] ?? null);
             if ($paidCents < $totalCents) throw new \Exception('Amount paid must cover the order total.');
             $amountPaid = $paidCents / 100;
+            $changeAmount = ($paidCents - $totalCents) / 100;
 
             /*
              * Check all required ingredients before creating the sale.
@@ -404,9 +408,10 @@ class POS extends Model
                     customer_name,
                     total_amount,
                     amount_paid,
+                    change_amount,
                     sale_date
                 )
-                VALUES (?, ?, ?, ?, ?)';
+                VALUES (?, ?, ?, ?, ?, ?)';
             $stmt = $this->db->prepare($saleInsertSql);
 
             $stmt->execute([
@@ -414,6 +419,7 @@ class POS extends Model
                 $customerName,
                 $total,
                 $amountPaid,
+                $changeAmount,
                 date('Y-m-d H:i:s')
             ]);
 
@@ -542,6 +548,7 @@ class POS extends Model
                 'sale_id' => $saleId,
                 'total_amount' => $total,
                 'amount_paid' => $amountPaid,
+                'change_amount' => $changeAmount,
                 'kiosk_order_id' => $kioskOrderId,
                 'loyalty_customer' => $customerUserId > 0,
                 'loyalty_point_earned' => $loyaltyPointEarned

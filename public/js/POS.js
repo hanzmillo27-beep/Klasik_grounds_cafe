@@ -52,6 +52,7 @@ $(document).ready(function () {
             $(s.checkoutBtn).on('click', handleCheckout);
 
             $(s.customerName).on('input', saveCustomerName);
+            $('#amount_paid').on('input', updateTotal);
 
             $(s.transactionsTable).on(
                 'click',
@@ -365,6 +366,10 @@ $(document).ready(function () {
             );
 
             $(s.cartTotal).text(formatMoney(total / 100));
+            const paid = String($('#amount_paid').val() || '').trim();
+            const paidCents = Math.round(Number(paid) * 100);
+            $('#payment-change').text(!/^\d{1,8}(?:\.\d{1,2})?$/.test(paid) ? '—'
+                : paidCents < total ? 'Insufficient payment' : formatMoney((paidCents - total) / 100));
             return total / 100;
         }
 

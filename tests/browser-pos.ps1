@@ -188,6 +188,14 @@ function assertOffline() {
     assert(!h.errors.length, 'Browser errors: ' + h.errors.join('; '));
     assert(!h.requests.some(x => x.path.includes('checkout')), 'Checkout must never be requested.');
 }
+function assertChange(expected) {
+    const change = document.querySelector('#payment-change');
+    assert(change && !change.isContentEditable, 'A read-only change preview is missing.');
+    const text = typeof expected === 'number'
+        ? String.fromCharCode(0x20b1) + expected.toFixed(2)
+        : expected === null ? String.fromCharCode(0x2014) : expected;
+    assert(change.textContent === text, 'Change preview differs: ' + change.textContent + ' versus ' + text);
+}
 '@
 
 try {
@@ -228,16 +236,30 @@ click('.btn-increase[data-id="4"]');
 click('.btn-increase[data-id="4"]');
 click('.btn-add-product[data-id="5"]');
 assertCart([[4, 3, 0.10], [5, 1, 0.20]], 0.50);
+assertChange(null);
+$('#amount_paid').val('0.50').trigger('input');
+assertChange(0);
+$('#amount_paid').val('1.00').trigger('input');
+assertChange(0.50);
+$('#amount_paid').val('0.49').trigger('input');
+assertChange('Insufficient payment');
+$('#amount_paid').val('1.00').trigger('input');
+assertChange(0.50);
 click('.btn-increase[data-id="5"]');
 click('.btn-increase[data-id="5"]');
 assertCart([[4, 3, 0.10], [5, 3, 0.20]], 0.90);
+assertChange(0.10);
 click('.btn-decrease[data-id="4"]');
 click('.btn-decrease[data-id="4"]');
 assertCart([[4, 1, 0.10], [5, 3, 0.20]], 0.70);
+assertChange(0.30);
 click('.btn-remove[data-id="4"]');
 assertCart([[5, 3, 0.20]], 0.60);
+assertChange(0.40);
 click('.btn-remove[data-id="5"]');
 assertCart([], 0);
+$('#amount_paid').val('').trigger('input');
+assertChange(null);
 click('.btn-add-product[data-id="1"]');
 click('.btn-increase[data-id="1"]');
 click('.btn-add-product[data-id="2"]');
@@ -264,6 +286,7 @@ assertCart([[1, 2, 125.5], [2, 1, 140]], 391);
 assert($('#customer_name').val() === 'Kiosk customer', 'Kiosk customer was not displayed.');
 assert(localStorage.getItem('pos_customer_name') === 'Kiosk customer', 'Retrieved customer was not persisted.');
 assert($('#amount_paid').val() === '', 'Retrieving a kiosk order must clear a previous payment.');
+assertChange(null);
 click('.btn-remove[data-id="1"]');
 assertCart([[2, 1, 140]], 140);
 click('.btn-add-product[data-id="1"]');
@@ -306,6 +329,7 @@ assertCart([], 0);
 assert(!localStorage.getItem('pos_kiosk_order_id') && !localStorage.getItem('pos_kiosk_items'), 'New order retained kiosk metadata.');
 assert(!localStorage.getItem('pos_customer_name') && !$('#customer_name').val(), 'New order retained a customer name.');
 assert($('#amount_paid').val() === '' && !$('#amount_paid').prop('disabled'), 'New order must clear the amount paid and leave its input enabled.');
+assertChange(null);
 click('.btn-add-product[data-id="1"]');
 assertCart([[1, 1, 999]], 999);
 click('.btn-remove[data-id="1"]');

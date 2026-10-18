@@ -106,6 +106,7 @@ class POSController extends BaseController
             'status'=>'success', 'message'=>$message,
             'sale_id'=>$result['sale_id'], 'total_amount'=>$result['total_amount'],
             'amount_paid'=>$result['amount_paid'],
+            'change_amount'=>$result['change_amount'],
             'loyalty_point_earned'=>$result['loyalty_point_earned']
         ]);
     }

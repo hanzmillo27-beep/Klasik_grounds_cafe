@@ -4,6 +4,7 @@ require_once __DIR__ . '/product_fixture.php';
 $db->exec('CREATE TABLE sales (
     sale_id ' . $identity . ', user_id INTEGER NOT NULL REFERENCES users(id),
     customer_name VARCHAR(100), total_amount NUMERIC(10,2) NOT NULL, amount_paid NUMERIC(10,2),
+    change_amount NUMERIC(10,2),
     sale_date TIMESTAMP NOT NULL
 )');
 $db->exec('CREATE TABLE sale_items (

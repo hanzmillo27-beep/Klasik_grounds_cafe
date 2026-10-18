@@ -27,7 +27,7 @@ The earlier audit is retained as the historical baseline.
 | FR-019 | Complete | `php tests/fr_019.php` on SQLite/PostgreSQL; `tests/browser-pos.ps1` on Edge; item removal, reload, historical prices and guarded cart edits |
 | FR-020 | Complete | `php tests/fr_020.php`; integer-cent calculations, trusted prices, displayed-total check, price-refresh UI |
 | FR-021 | Complete | `php tests/fr_021.php`; required validated cash tender, persisted payment, no sale/stock change for insufficient payment |
-| FR-022 | Pending | |
+| FR-022 | Complete | `php tests/fr_022.php`; trusted saved change, exact/overpayment and live jQuery change preview |
 | FR-023 | Pending | |
 | FR-024 | Pending | |
 | FR-025 | Pending | |
