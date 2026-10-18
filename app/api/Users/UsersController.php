@@ -118,6 +118,17 @@ class UsersController extends BaseController
         if ($_SERVER['REQUEST_METHOD'] === 'POST'){
             $data = $_POST;
             $this->guardOwnerRole($data['role'] ?? '');
+            if (!is_string($data['username'] ?? null) || !is_string($data['password'] ?? '')) {
+                $this->json(['status'=>'error','message'=>'Enter a valid username and password.']);
+            }
+            $data['username'] = trim($data['username']);
+            $data['password'] = $data['password'] ?? '';
+            if (strlen($data['username']) > 100 || ($data['password'] !== '' && (strlen($data['password']) < 4 || strlen($data['password']) > 72))) {
+                $this->json(['status'=>'error','message'=>'Use a username up to 100 characters and a password of 4 to 72 characters.']);
+            }
+            if ($this->Users->usernameExists($data['username'], $id)) {
+                $this->json(['status'=>'error','message'=>'Username is already taken.']);
+            }
 
             if (empty($data['username'])) {
                 $this->json([
@@ -143,7 +154,12 @@ class UsersController extends BaseController
 
             $data['id'] = $id;
 
-            if ($this->Users->save($data)) {
+            try { $saved = $this->Users->save($data); }
+            catch (\PDOException $error) {
+                http_response_code(in_array((string) $error->getCode(), ['23000','23505'], true) ? 409 : 500);
+                $this->json(['status'=>'error','message'=>'Unable to update the account. Check that the username is unique.']);
+            }
+            if ($saved) {
                 $this->json([
                     'status' => 'success',
                     'message' => 'User updated successfully.'

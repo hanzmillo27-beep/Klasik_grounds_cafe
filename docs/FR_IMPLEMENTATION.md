@@ -12,7 +12,7 @@ The earlier audit is retained as the historical baseline.
 | FR-004 | Complete | `php tests/fr_004.php`; role refresh, action permissions, owner protection |
 | FR-005 | Complete | `php tests/fr_005.php`; POST logout and destroyed session |
 | FR-006 | Complete | `php tests/fr_006.php`; validated account creation and duplicate checks |
-| FR-007 | Pending | |
+| FR-007 | Complete | `php tests/fr_007.php`; safe targeted updates and password retention |
 | FR-008 | Pending | |
 | FR-009 | Pending | |
 | FR-010 | Pending | |

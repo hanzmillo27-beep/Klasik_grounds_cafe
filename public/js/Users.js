@@ -60,7 +60,7 @@ const UsersModule = (function () {
                 $(s.modalTitle).text('Edit User');
                 $(s.saveBtn).text('Update');
                 $(s.modal).modal('show');
-                $(s.name).trigger('focus');
+                $(s.username).trigger('focus');
             })
             .fail((xhr) => {
                 handleAjaxError(xhr);

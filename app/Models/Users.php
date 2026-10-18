@@ -43,10 +43,11 @@ class Users extends Model
         return $stmt->fetch() ?: null;
     }
 
-    public function usernameExists($username)
+    public function usernameExists($username, $excludeId = null)
     {
         $sql = 'SELECT COUNT(*) FROM users WHERE username = ?';
         $params = [$username];
+        if ($excludeId !== null) { $sql .= ' AND id <> ?'; $params[] = $excludeId; }
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
