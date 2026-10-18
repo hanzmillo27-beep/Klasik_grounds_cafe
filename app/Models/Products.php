@@ -130,6 +130,7 @@ class Products extends Model
                 ]);
 
                 $productId = $data['product_id'];
+                if ($stmt->rowCount() !== 1) throw new \RuntimeException('Product not found.');
 
                 $stmt = $this->db->prepare(
                     'DELETE FROM product_ingredients

@@ -627,7 +627,9 @@ $(document).on(
 
             $.ajax({
 
-                url: `${base_url}/api/Products/add`,
+                url: $('#id').val()
+                    ? `${base_url}/api/Products/edit/${encodeURIComponent($('#id').val())}`
+                    : `${base_url}/api/Products/add`,
 
                 type: 'POST',
 

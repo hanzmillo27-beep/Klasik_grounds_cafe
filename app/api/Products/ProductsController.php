@@ -45,6 +45,10 @@ class ProductsController extends BaseController
         }
         $error = $this->Products->validationError($data);
         if ($error !== null) $this->json(['status'=>'error','message'=>$error]);
+        if (!empty($data['product_id']) && (!filter_var($data['product_id'], FILTER_VALIDATE_INT) || !$this->Products->findByID($data['product_id']))) {
+            http_response_code(404);
+            $this->json(['status'=>'error','message'=>'Product not found.']);
+        }
 
         if (empty($data['product_name'])) {
             $this->json([
@@ -86,13 +90,21 @@ class ProductsController extends BaseController
 
     public function edit($id)
     {
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) $this->json(['status'=>'error','message'=>'Invalid product ID.']);
         $product = $this->Products->findByID($id);
+        if (!$product) {
+            http_response_code(404);
+            $this->json(['status'=>'error','message'=>'Product not found.']);
+        }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $data = $_POST;
 
             $data['product_id'] = $id;
+            $error = $this->Products->validationError($data);
+            if ($error !== null) $this->json(['status'=>'error','message'=>$error]);
 
             if (empty($data['product_name'])) {
                 $this->json([
