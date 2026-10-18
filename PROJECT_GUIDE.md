@@ -155,6 +155,15 @@ Examples:
 - Kiosk order claiming is treated as a POS permission even though its URL starts with `Kiosk`.
 - Unauthorized page requests become redirects or `Forbidden`; unauthorized API requests become JSON errors.
 
+### `app/Core/RateLimiter.php`
+
+- Allows five POST requests to `/Auth/login` per client IP in a 60-second window, including successful and incomplete attempts.
+- Excess attempts return HTTP 429 with `Retry-After` and the existing sign-in form. Blocked attempts do not extend the window.
+- Uses a locked temporary file shared by PHP workers and browser sessions. Expired counters are removed automatically. Counters are local to one server instance and reset when its temporary storage is cleared, such as during a Render redeploy.
+- On Render, reads Cloudflare's client IP header; locally, uses `REMOTE_ADDR` and ignores forwarded headers.
+- Storage failures return HTTP 503 instead of silently allowing unlimited attempts.
+- Run the focused checks with `php tests/rate_limiter.php`.
+
 ### `app/Core/SupabaseStorage.php`
 
 - Limits uploads to 5 MB.

@@ -3,21 +3,15 @@
 namespace Controllers;
 
 use Core\BaseController;
+use Core\RateLimiter;
 use Models\Users;
 
 
 class AuthController extends BaseController{
 
-    private $Users;
-
-    public function __construct()
-    {
-        $this->Users = new Users();
-    }
-
     public function index()
     {
-        $users = $this->Users->find();
+        $users = (new Users())->find();
         $count = count($users);
         if ($count === 0) {
             $this->redirect(BASE_URL . '/Users/register');
@@ -32,6 +26,25 @@ class AuthController extends BaseController{
     public  function login()
     {
          if ($_SERVER['REQUEST_METHOD'] === 'POST'){
+            try {
+                $retryAfter = (new RateLimiter())->attempt('login:' . RateLimiter::clientIp());
+            } catch (\RuntimeException $e) {
+                error_log($e->getMessage());
+                http_response_code(503);
+                header('Retry-After: 60');
+                $_SESSION['error'] = 'Sign-in is temporarily unavailable. Please try again in a minute.';
+                $this->view('Auth/index', ['title' => 'Login'], 'auth');
+                return;
+            }
+
+            if ($retryAfter > 0) {
+                http_response_code(429);
+                header('Retry-After: ' . $retryAfter);
+                $_SESSION['error'] = 'Too many sign-in attempts. Please try again in ' . $retryAfter . ' seconds.';
+                $this->view('Auth/index', ['title' => 'Login'], 'auth');
+                return;
+            }
+
             $username = trim($_POST['username'] ?? '');
             $password = $_POST['password'] ?? '';
 
@@ -40,7 +53,7 @@ class AuthController extends BaseController{
                 $this->redirect(BASE_URL . '/Auth');
             }
 
-            $user = $this->Users->findByUsername($username);
+            $user = (new Users())->findByUsername($username);
             
             if (!$user || !password_verify($password, $user->password)) {
                 $_SESSION['error'] = 'Invalid username or password.';
