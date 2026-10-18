@@ -215,11 +215,14 @@ a:hover,
 .kg-nav a:hover { color: #fff; text-decoration: none; }
 
 .kg-nav .kg-nav-button {
+    border: 1px solid transparent;
     padding: 0.48rem 1rem;
     border-radius: 0.55rem;
     background: #fff;
     color: #090909;
+    font-size: 0.9rem;
     font-weight: 600;
+    cursor: pointer;
 }
 
 .kg-nav .kg-nav-button:hover { background: #e8e8e8; color: #090909; }
@@ -330,17 +333,8 @@ a:hover,
 
 .kg-section { padding: 6rem 7%; }
 .kg-section-heading { margin: 0 auto 3.2rem; text-align: center; }
-.kg-section-heading h2, .kg-login-intro h2 { margin: 0; color: #fff; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.03em; }
-.kg-section-heading > p:last-child, .kg-login-intro > p:last-child { margin: 0.75rem 0 0; color: #989898; font-size: 1rem; }
-
-.kg-login-section {
-    padding: 5rem 15%;
-    border-top: 1px solid #1e1e1e;
-    background: #0b0b0d;
-}
-
-.kg-login-intro h2 { max-width: 25rem; }
-.kg-login-intro > p:last-child { max-width: 26rem; line-height: 1.6; }
+.kg-section-heading h2 { margin: 0; color: #fff; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.03em; }
+.kg-section-heading > p:last-child { margin: 0.75rem 0 0; color: #989898; font-size: 1rem; }
 
 .kg-login-card {
     width: 100%;
@@ -352,7 +346,43 @@ a:hover,
     box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.25);
 }
 
-.kg-login-card h3 { margin: 0 0 1.5rem; color: #fff; font-size: 1.4rem; }
+.kg-login-dialog {
+    width: calc(100% - 2rem);
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    overflow-y: auto;
+    color: #f5f5f5;
+}
+
+.kg-login-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(4px);
+}
+
+body.kg-dialog-open { overflow: hidden; }
+.kg-login-dialog h2 { margin: 0; color: #fff; font-size: 1.75rem; }
+.kg-login-dialog #login-description { margin: 0.65rem 0 1.5rem; color: #a5a5ac; line-height: 1.5; }
+
+.kg-dialog-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: #bdbdbd;
+    font-size: 1.75rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.kg-dialog-close:hover { background: #2b2b2e; color: #fff; }
+.kg-dialog-close:focus-visible,
+[data-login-open]:focus-visible { outline: 2px solid #d0a65d; outline-offset: 3px; }
 .kg-login-card label { display: block; margin: 1rem 0 0.45rem; color: #bdbdbd; font-size: 0.85rem; }
 .kg-login-card input { display: block; width: 100%; height: 3rem; padding: 0 0.9rem; border: 1px solid #3a3a3e; border-radius: 0.55rem; outline: 0; background: #0f0f11; color: #fff; }
 .kg-login-card input:focus { border-color: #a88945; box-shadow: 0 0 0 0.16rem rgba(168, 137, 69, 0.18); }
@@ -377,12 +407,6 @@ a:hover,
 .kg-footer a { color: #d0a65d; }
 .kg-footer-copy { margin: 2rem 0 0; color: #5f5f64; font-size: 0.78rem; }
 
-@media (max-width: 900px) {
-    .kg-login-section { padding: 4.5rem 8%; }
-    .kg-login-intro { text-align: center; }
-    .kg-login-intro h2, .kg-login-intro > p:last-child { margin-right: auto; margin-left: auto; }
-}
-
 @media (max-width: 700px) {
     .kg-topbar { padding: 0 1.2rem; }
     .kg-nav { gap: 0.8rem; }
@@ -398,6 +422,5 @@ a:hover,
     .kg-hero h1 { font-size: 2.4rem; }
     .kg-hero-actions { max-width: 15rem; margin-right: auto; margin-left: auto; }
     .kg-values .row > div { border-right: 0; }
-    .kg-login-section { padding-right: 1.2rem; padding-left: 1.2rem; }
     .kg-login-card { padding: 1.4rem; }
 }

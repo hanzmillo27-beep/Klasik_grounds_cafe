@@ -3,7 +3,7 @@
         <a href="<?= BASE_URL ?>/Auth" class="kg-wordmark">Klasik Grounds</a>
         <nav class="kg-nav d-flex align-items-center" aria-label="Main navigation">
             <a href="<?= BASE_URL ?>/Kiosk" class="d-none d-sm-inline">Order</a>
-            <a href="#login" class="kg-nav-button ml-2 ml-sm-3">Sign in</a>
+            <button type="button" class="kg-nav-button ml-2 ml-sm-3" data-login-open aria-haspopup="dialog" aria-controls="login-dialog">Sign in</button>
         </nav>
     </header>
 
@@ -16,7 +16,7 @@
                 <h1>Every cup is a masterpiece.</h1>
                 <p class="kg-hero-copy">Handcrafted drinks made with quality beans and fresh ingredients. Every cup, every time.</p>
                 <div class="kg-hero-actions d-flex flex-column flex-sm-row align-items-center justify-content-center">
-                    <a href="#login" class="kg-button kg-button-light mb-2 mb-sm-0">Join rewards</a>
+                    <button type="button" class="kg-button kg-button-light mb-2 mb-sm-0" data-login-open aria-haspopup="dialog" aria-controls="login-dialog">Join rewards</button>
                     <a href="<?= BASE_URL ?>/Kiosk" class="kg-button kg-button-outline ml-sm-3">Order</a>
                 </div>
                 </div>
@@ -33,50 +33,6 @@
             </div>
         </section>
 
-        <section id="login" class="kg-login-section">
-            <div class="container">
-                <div class="row align-items-center">
-                    <div class="col-12 col-lg-6 mb-4 mb-lg-0">
-                        <div class="kg-login-intro">
-                            <p class="kg-eyebrow">Welcome back</p>
-                            <h2>Sign in and keep earning.</h2>
-                            <p>Use your Klasik Grounds account to order and track your rewards.</p>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-6">
-                        <div class="kg-login-card mx-auto">
-                            <h3>Sign in</h3>
-
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success kg-alert">
-                        <?= htmlspecialchars($_SESSION['success']) ?>
-                    </div>
-                    <?php unset($_SESSION['success']); ?>
-                <?php endif; ?>
-
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger kg-alert">
-                        <?= htmlspecialchars($_SESSION['error']) ?>
-                    </div>
-                    <?php unset($_SESSION['error']); ?>
-                <?php endif; ?>
-
-                            <form id="login-form" method="post" action="<?= BASE_URL ?>/Auth/login">
-                                <label for="username">Username</label>
-                                <input id="username" name="username" type="text" placeholder="Username" autocomplete="username" required>
-
-                                <label for="password">Password</label>
-                                <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
-
-                                <button type="submit" class="kg-button kg-button-light kg-submit">Sign in</button>
-                            </form>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
     </main>
 
     <footer class="kg-footer">
@@ -92,3 +48,34 @@
         </div>
     </footer>
 </div>
+
+<dialog id="login-dialog" class="kg-login-card kg-login-dialog" aria-labelledby="login-title" aria-describedby="login-description" data-auto-open="<?= isset($_SESSION['error']) || isset($_SESSION['success']) ? 'true' : 'false' ?>">
+    <button type="button" class="kg-dialog-close" data-login-close aria-label="Close sign in">&times;</button>
+    <p class="kg-eyebrow">Welcome back</p>
+    <h2 id="login-title">Sign in</h2>
+    <p id="login-description">Use your Klasik Grounds account to order and track your rewards.</p>
+
+    <?php if (isset($_SESSION['success'])): ?>
+        <div class="alert alert-success kg-alert" role="status">
+            <?= htmlspecialchars($_SESSION['success']) ?>
+        </div>
+        <?php unset($_SESSION['success']); ?>
+    <?php endif; ?>
+
+    <?php if (isset($_SESSION['error'])): ?>
+        <div class="alert alert-danger kg-alert" role="alert">
+            <?= htmlspecialchars($_SESSION['error']) ?>
+        </div>
+        <?php unset($_SESSION['error']); ?>
+    <?php endif; ?>
+
+    <form id="login-form" method="post" action="<?= BASE_URL ?>/Auth/login">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" placeholder="Username" autocomplete="username" required autofocus>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
+
+        <button type="submit" class="kg-button kg-button-light kg-submit">Sign in</button>
+    </form>
+</dialog>

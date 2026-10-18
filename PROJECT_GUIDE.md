@@ -357,6 +357,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Loads fonts, icons, AdminLTE CSS, and the cafe stylesheet.
 - Uses a cache-busting version based on the stylesheet modification time.
 - Places the controller-rendered content inside `body.kg-landing-page`.
+- Loads the versioned `public/js/Auth.js` only on the login page to control its popup.
 
 ### `app/views/Layout/default.php`
 
@@ -369,8 +370,10 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 ### `app/views/Auth/index.php`
 
 - Builds the public dark landing/login page.
-- Shows the round cafe logo, hero background, order link, sign-in anchor, values strip, sign-in form, address, Instagram, Facebook, and phone footer.
+- Shows the round cafe logo, hero background, order link, sign-in button, values strip, address, Instagram, Facebook, and phone footer.
+- Sign in and Join rewards open a dark native dialog containing the sign-in form. It supports Escape, a close button, and backdrop dismissal; `/Auth#login` also opens it.
 - Displays one-time `$_SESSION['success']` and `$_SESSION['error']` messages.
+- Reopens the dialog for those messages, including failed credentials and the 30-second rate limit response.
 - Posts credentials to `/Auth/login`.
 
 ### `app/views/Dashboard/index.php`
