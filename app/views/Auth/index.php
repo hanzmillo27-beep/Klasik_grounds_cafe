@@ -49,8 +49,10 @@
     </footer>
 </div>
 
-<dialog id="login-dialog" class="kg-login-card kg-login-dialog" aria-labelledby="login-title" aria-describedby="login-description" data-auto-open="<?= isset($_SESSION['error']) || isset($_SESSION['success']) ? 'true' : 'false' ?>">
-    <button type="button" class="kg-dialog-close" data-login-close aria-label="Close sign in">&times;</button>
+<div id="login-dialog" class="modal fade kg-login-modal" tabindex="-1" role="dialog" aria-labelledby="login-title" aria-describedby="login-description" aria-hidden="true" data-auto-open="<?= isset($_SESSION['error']) || isset($_SESSION['success']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content kg-login-card kg-login-dialog">
+    <button type="button" class="kg-dialog-close" data-dismiss="modal" aria-label="Close sign in">&times;</button>
     <p class="kg-eyebrow">Welcome back</p>
     <h2 id="login-title">Sign in</h2>
     <p id="login-description">Use your Klasik Grounds account to order and track your rewards.</p>
@@ -78,4 +80,6 @@
 
         <button type="submit" class="kg-button kg-button-light kg-submit">Sign in</button>
     </form>
-</dialog>
+    </div>
+    </div>
+</div>

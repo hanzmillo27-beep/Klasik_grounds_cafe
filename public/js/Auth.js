@@ -1,37 +1,10 @@
-(function () {
-    const dialog = document.getElementById('login-dialog');
-    if (!dialog) return;
-
-    function openLogin() {
-        if (!dialog.open) {
-            dialog.showModal();
-            document.body.classList.add('kg-dialog-open');
-        }
+$(function () {
+    var $dialog = $('#login-dialog');
+    if (!$dialog.length) return;
+    $('[data-login-open]').on('click', function () { $dialog.modal('show'); });
+    $dialog.on('shown.bs.modal', function () { $('#username').trigger('focus'); });
+    $dialog.on('hidden.bs.modal', function () { $('#password').val(''); });
+    if ($dialog.data('auto-open') || window.location.hash === '#login') {
+        $dialog.modal('show');
     }
-
-    document.querySelectorAll('[data-login-open]').forEach(function (button) {
-        button.addEventListener('click', openLogin);
-    });
-
-    dialog.querySelector('[data-login-close]').addEventListener('click', function () {
-        dialog.close();
-    });
-
-    dialog.addEventListener('click', function (event) {
-        if (event.target !== dialog) return;
-        const bounds = dialog.getBoundingClientRect();
-        if (event.clientX < bounds.left || event.clientX > bounds.right ||
-            event.clientY < bounds.top || event.clientY > bounds.bottom) {
-            dialog.close();
-        }
-    });
-
-    dialog.addEventListener('close', function () {
-        document.body.classList.remove('kg-dialog-open');
-        dialog.querySelector('#password').value = '';
-    });
-
-    if (dialog.dataset.autoOpen === 'true' || window.location.hash === '#login') {
-        openLogin();
-    }
-})();
+});

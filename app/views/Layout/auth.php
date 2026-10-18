@@ -35,7 +35,9 @@
     <?= $content ?>
 
     <?php if (($title ?? '') === 'Login'): ?>
-        <script src="<?= BASE_URL ?>/js/Auth.js?v=<?= filemtime(PUBLIC_PATH . '/js/Auth.js') ?>" defer></script>
+        <script src="<?= BASE_URL ?>/plugins/jquery/jquery.min.js"></script>
+        <script src="<?= BASE_URL ?>/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+        <script src="<?= BASE_URL ?>/js/Auth.js?v=<?= filemtime(PUBLIC_PATH . '/js/Auth.js') ?>"></script>
     <?php endif; ?>
 
 </body>
