@@ -10,7 +10,7 @@ $cart = [
     ['product_id' => 1, 'quantity' => 2, 'unit_price' => '0.01', 'subtotal' => '0.02'],
     ['product_id' => 2, 'quantity' => 3, 'unit_price' => '999', 'subtotal' => '2997'],
 ];
-$result = $pos->checkout(['items' => $cart, 'expected_total' => '251.30', 'total_amount' => '0.01']);
+$result = $pos->checkout(['amount_paid' => '1000.00', 'items' => $cart, 'expected_total' => '251.30', 'total_amount' => '0.01']);
 $sale = $pos->transaction($result['sale_id']);
 check((int) round((float) $result['total_amount'] * 100) === 25130
     && (int) round((float) $sale->total_amount * 100) === 25130,
@@ -23,7 +23,7 @@ check((int) round((float) $sale->items[0]->subtotal * 100) === 25100
 
 function rejectInvalidTotal(Models\POS $pos, array $payload, ?string $message = null): void {
     $rejected = false;
-    try { $pos->checkout($payload); }
+    try { $pos->checkout($payload + ['amount_paid' => '99999999.99']); }
     catch (PDOException $error) { throw new RuntimeException('Invalid totals must fail validation before database writes.', 0, $error); }
     catch (Exception $error) {
         $rejected = true;

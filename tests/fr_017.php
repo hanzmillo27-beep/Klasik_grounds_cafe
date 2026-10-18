@@ -6,7 +6,7 @@ check((new Models\Products())->save(productPayload([
 ])), 'Could not create a second product.');
 $pos = new Models\POS();
 $kiosk = new Models\Kiosk();
-$result = $pos->checkout(['items' => [
+$result = $pos->checkout(['amount_paid' => '1000.00', 'items' => [
     ['product_id' => 1, 'quantity' => 2, 'unit_price' => 1],
     ['product_id' => 2, 'quantity' => 3, 'unit_price' => 1],
 ]]);
@@ -38,7 +38,7 @@ foreach ($invalidCarts as $index => $items) {
     foreach (['POS' => $pos, 'Kiosk' => $kiosk] as $name => $model) {
         $rejected = false;
         try {
-            $name === 'POS' ? $model->checkout(['items' => $items]) : $model->submit(['items' => $items]);
+            $name === 'POS' ? $model->checkout(['amount_paid' => '1000.00', 'items' => $items]) : $model->submit(['items' => $items]);
         } catch (PDOException | TypeError $error) {
             throw new RuntimeException($name . ' invalid cart ' . $index . ' must fail validation safely.', 0, $error);
         } catch (Exception $error) {

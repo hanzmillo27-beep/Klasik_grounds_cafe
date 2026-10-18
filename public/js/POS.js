@@ -437,6 +437,7 @@ $(document).ready(function () {
                 clearSavedCustomerName();
                 $(s.customerName).val('');
                 $('#kiosk-reference-input').val('');
+                $('#amount_paid').val('');
                 renderCart();
             }
             if (!cart.length) { newOrder(); return; }
@@ -500,6 +501,7 @@ $(document).ready(function () {
                 kioskOrderId = Number(order.kiosk_order_id);
 
                 $(s.customerName).val(order.customer_name || '');
+                $('#amount_paid').val('');
                 saveCustomerName();
                 $('#kiosk-reference-input').val(order.reference_code);
 
@@ -530,6 +532,12 @@ $(document).ready(function () {
                 msgBox('error', 'Cart is empty.');
                 return;
             }
+            const amountPaid = String($('#amount_paid').val() || '').trim();
+            if (!/^\d{1,8}(?:\.\d{1,2})?$/.test(amountPaid) || Math.round(Number(amountPaid) * 100) < Math.round(updateTotal() * 100)) {
+                msgBox('error', 'Enter an amount paid that covers the order total.');
+                $('#amount_paid').trigger('focus');
+                return;
+            }
 
             const fd = new FormData();
 
@@ -540,6 +548,7 @@ $(document).ready(function () {
                     : '';
 
                 fd.append('customer_name', customerName);
+            fd.append('amount_paid', amountPaid);
             fd.append('expected_total', updateTotal().toFixed(2));
 
             fd.append(
@@ -557,6 +566,7 @@ $(document).ready(function () {
 }
 
             checkingOut = true;
+            $('#amount_paid').prop('disabled', true);
             $(s.checkoutBtn).prop('disabled', true);
 
             $.ajax({
@@ -584,6 +594,7 @@ $(document).ready(function () {
                         clearSavedCustomerName();
 
                         $(s.customerName).val('');
+                        $('#amount_paid').val('');
 
                         renderCart();
 
@@ -596,6 +607,7 @@ $(document).ready(function () {
                 })
                 .always(() => {
                     checkingOut = false;
+                    $('#amount_paid').prop('disabled', false);
                     $(s.checkoutBtn).prop('disabled', false);
                 });
         }

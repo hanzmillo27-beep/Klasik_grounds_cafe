@@ -84,6 +84,7 @@ class POS extends Model
                 s.user_id,
                 s.customer_name,
                 s.total_amount,
+                s.amount_paid,
                 s.sale_date,
                 u.username AS user_name,
                 COUNT(si.sale_item_id) AS item_count
@@ -97,6 +98,7 @@ class POS extends Model
                 s.user_id,
                 s.customer_name,
                 s.total_amount,
+                s.amount_paid,
                 s.sale_date,
                 u.username
              ORDER BY s.sale_date DESC, s.sale_id DESC'
@@ -113,6 +115,7 @@ class POS extends Model
                 s.user_id,
                 s.customer_name,
                 s.total_amount,
+                s.amount_paid,
                 s.sale_date,
                 u.username AS user_name
              FROM sales s
@@ -341,6 +344,9 @@ class POS extends Model
             if (isset($data['expected_total']) && Money::cents($data['expected_total']) !== $totalCents) {
                 throw new \Exception('Order total changed. Review the current prices before checkout.');
             }
+            $paidCents = Money::paymentCents($data['amount_paid'] ?? null);
+            if ($paidCents < $totalCents) throw new \Exception('Amount paid must cover the order total.');
+            $amountPaid = $paidCents / 100;
 
             /*
              * Check all required ingredients before creating the sale.
@@ -397,15 +403,17 @@ class POS extends Model
                     user_id,
                     customer_name,
                     total_amount,
+                    amount_paid,
                     sale_date
                 )
-                VALUES (?, ?, ?, ?)';
+                VALUES (?, ?, ?, ?, ?)';
             $stmt = $this->db->prepare($saleInsertSql);
 
             $stmt->execute([
                 $userId,
                 $customerName,
                 $total,
+                $amountPaid,
                 date('Y-m-d H:i:s')
             ]);
 
@@ -533,6 +541,7 @@ class POS extends Model
             return [
                 'sale_id' => $saleId,
                 'total_amount' => $total,
+                'amount_paid' => $amountPaid,
                 'kiosk_order_id' => $kioskOrderId,
                 'loyalty_customer' => $customerUserId > 0,
                 'loyalty_point_earned' => $loyaltyPointEarned

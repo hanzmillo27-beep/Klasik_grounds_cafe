@@ -210,6 +210,19 @@ try {
     $generation = Wait-PosReady
     $phaseOne = @'
 assertCart([], 0);
+const paidInput = document.querySelector('#amount_paid');
+assert(paidInput && paidInput.type === 'number' && paidInput.required, 'A required numeric amount-paid input is missing.');
+assert(paidInput.min === '0' && paidInput.max === '99999999.99' && paidInput.step === '0.01', 'Payment input bounds or cent precision differ.');
+assert(!paidInput.disabled && paidInput.value === '', 'Payment input must start enabled and empty.');
+paidInput.value = '12.34';
+assert(paidInput.checkValidity(), 'A payment with two decimal places must be valid.');
+paidInput.value = '12.345';
+assert(paidInput.validity.stepMismatch, 'Sub-cent payments must violate input precision.');
+paidInput.value = '-0.01';
+assert(paidInput.validity.rangeUnderflow, 'Negative payments must violate the minimum.');
+paidInput.value = '100000000';
+assert(paidInput.validity.rangeOverflow, 'Payments above the supported range must be invalid.');
+paidInput.value = '';
 click('.btn-add-product[data-id="4"]');
 click('.btn-increase[data-id="4"]');
 click('.btn-increase[data-id="4"]');
@@ -239,6 +252,7 @@ click('.btn-add-product[data-id="1"]');
 click('.btn-decrease[data-id="1"]');
 assertCart([], 0);
 $('#customer_name').val('Stale name').trigger('input');
+$('#amount_paid').val('999.99');
 $('#kiosk-reference-input').val('KG-BROWSER');
 click('#btn-load-kiosk-order');
 click('.btn-add-product[data-id="3"]');
@@ -249,6 +263,7 @@ for (let attempt = 0; attempt < 100 && cart().length !== 2; attempt++) await new
 assertCart([[1, 2, 125.5], [2, 1, 140]], 391);
 assert($('#customer_name').val() === 'Kiosk customer', 'Kiosk customer was not displayed.');
 assert(localStorage.getItem('pos_customer_name') === 'Kiosk customer', 'Retrieved customer was not persisted.');
+assert($('#amount_paid').val() === '', 'Retrieving a kiosk order must clear a previous payment.');
 click('.btn-remove[data-id="1"]');
 assertCart([[2, 1, 140]], 140);
 click('.btn-add-product[data-id="1"]');
@@ -275,6 +290,7 @@ return 'Decimal-price totals, normal and kiosk add, quantity, individual removal
 assertCart([[1, 1, 125.5]], 125.5);
 assert($('#customer_name').val() === 'Edited kiosk customer', 'Customer edit did not survive reload.');
 assert(localStorage.getItem('pos_kiosk_order_id') === '42', 'Kiosk context did not survive reload.');
+assert($('#amount_paid').val() === '', 'A payment must not be restored from an earlier page load.');
 click('.btn-remove[data-id="1"]');
 assertCart([], 0);
 click('.btn-add-product[data-id="1"]');
@@ -283,17 +299,19 @@ assert(cart()[0].product_name === 'Original Americano', 'Historical product name
 click('.btn-remove[data-id="1"]');
 click('.btn-add-product[data-id="3"]');
 assertCart([[3, 1, 50]], 50);
+$('#amount_paid').val('100.00');
 click('#btnClear');
 await new Promise(r => setTimeout(r, 0));
 assertCart([], 0);
 assert(!localStorage.getItem('pos_kiosk_order_id') && !localStorage.getItem('pos_kiosk_items'), 'New order retained kiosk metadata.');
 assert(!localStorage.getItem('pos_customer_name') && !$('#customer_name').val(), 'New order retained a customer name.');
+assert($('#amount_paid').val() === '' && !$('#amount_paid').prop('disabled'), 'New order must clear the amount paid and leave its input enabled.');
 click('.btn-add-product[data-id="1"]');
 assertCart([[1, 1, 999]], 999);
 click('.btn-remove[data-id="1"]');
 assertCart([], 0);
 assertOffline();
-return 'Reload preserves edited cart, kiosk context, historical price/name, and customer; New order clears context. No checkout request was made.';
+return 'Reload preserves edited cart, kiosk context, historical price/name, and customer; New order clears context and payment. No checkout request was made.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $phaseTwo + '})()'))
     Write-Output 'POS browser regression passed using the real PHP view, jQuery, Bootstrap, and POS.js.'

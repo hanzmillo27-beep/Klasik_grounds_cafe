@@ -3,7 +3,7 @@ require __DIR__ . '/pos_fixture.php';
 
 function rejectEmptyOrder(Models\POS $pos, array $payload): void {
     $rejected = false;
-    try { $pos->checkout($payload); }
+    try { $pos->checkout($payload + ['amount_paid' => '1000.00']); }
     catch (PDOException $error) { throw new RuntimeException('An empty cart must fail validation safely.', 0, $error); }
     catch (Exception $error) { $rejected = stripos($error->getMessage(), 'empty') !== false; }
     check($rejected && !Core\Database::$connection->inTransaction(), 'Removing every item must reject checkout and roll back.');
@@ -18,7 +18,7 @@ $pos = new Models\POS();
 $kiosk = new Models\Kiosk();
 $cart = [['product_id' => 1, 'quantity' => 1], ['product_id' => 2, 'quantity' => 2]];
 array_pop($cart);
-$normal = $pos->checkout(['items' => $cart]);
+$normal = $pos->checkout(['amount_paid' => '1000.00', 'items' => $cart]);
 $sale = $pos->transaction($normal['sale_id']);
 check(count($sale->items) === 1 && (int) $sale->items[0]->product_id === 1
     && abs((float) $sale->total_amount - 125.50) < 0.00001,
@@ -30,7 +30,7 @@ rejectEmptyOrder($pos, ['items' => []]);
 $submitted = $kiosk->submit(['items' => [['product_id' => 1, 'quantity' => 1], ['product_id' => 2, 'quantity' => 2]]]);
 $claimed = $kiosk->claim($submitted['reference_code'], 2);
 $remaining = [['product_id' => 2, 'quantity' => 2]];
-$result = $pos->checkout(['kiosk_order_id' => $claimed->kiosk_order_id, 'items' => $remaining]);
+$result = $pos->checkout(['amount_paid' => '1000.00', 'kiosk_order_id' => $claimed->kiosk_order_id, 'items' => $remaining]);
 $sale = $pos->transaction($result['sale_id']);
 check(count($sale->items) === 1 && (int) $sale->items[0]->product_id === 2
     && (int) $sale->items[0]->quantity === 2 && abs((float) $sale->total_amount - 300) < 0.00001,

@@ -8,7 +8,7 @@ check((new Models\Products())->save(productPayload([
 ])), 'Could not create a product to add to an order.');
 $normalCart = [['product_id' => 1, 'quantity' => 1]];
 $normalCart[0]['quantity'] = 2;
-$normal = $pos->checkout(['customer_name' => 'Edited customer', 'items' => $normalCart]);
+$normal = $pos->checkout(['amount_paid' => '1000.00', 'customer_name' => 'Edited customer', 'items' => $normalCart]);
 $sale = $pos->transaction($normal['sale_id']);
 check(count($sale->items) === 1 && (int) $sale->items[0]->quantity === 2
     && abs((float) $sale->total_amount - 251) < 0.00001,
@@ -19,7 +19,7 @@ $claimed = $kiosk->claim($submitted['reference_code'], 2);
 check($claimed->status === 'claimed', 'The cashier could not claim the kiosk order.');
 $db->exec("UPDATE products SET product_name = 'Current Americano', product_price = 999 WHERE product_id = 1");
 $db->exec("UPDATE products SET product_name = 'Current Latte', product_price = 160 WHERE product_id = 2");
-$edited = ['kiosk_order_id' => $claimed->kiosk_order_id, 'customer_name' => 'Updated kiosk customer', 'items' => [
+$edited = ['amount_paid' => '1000.00', 'kiosk_order_id' => $claimed->kiosk_order_id, 'customer_name' => 'Updated kiosk customer', 'items' => [
     ['product_id' => 1, 'quantity' => 2, 'product_name' => 'Forged name', 'unit_price' => 1],
     ['product_id' => 2, 'quantity' => 1, 'product_name' => 'Forged extra', 'unit_price' => 1],
 ]];
