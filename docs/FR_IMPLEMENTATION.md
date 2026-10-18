@@ -6,7 +6,7 @@ The earlier audit is retained as the historical baseline.
 
 | Requirement | Status | Verification |
 | --- | --- | --- |
-| FR-001 | Complete | `php tests/fr_001.php`; jQuery/Bootstrap sign-in popup |
+| FR-001 | Complete | `php tests/fr_001.php`; `tests/browser-auth.ps1`; jQuery/Bootstrap dark sign-in popup |
 | FR-002 | Complete | `php tests/fr_002.php`; malformed credential validation |
 | FR-003 | Complete | `php tests/fr_003.php`; accessible error and cooldown popup |
 | FR-004 | Complete | `php tests/fr_004.php`; role refresh, action permissions, owner protection |
@@ -55,6 +55,7 @@ Get-ChildItem tests/fr_*.php | ForEach-Object {
     if ($LASTEXITCODE -ne 0) { throw "Requirement check failed: $($_.Name)" }
 }
 php tests/rate_limiter.php
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-auth.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-pos.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-inventory.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-reports.ps1
@@ -81,3 +82,6 @@ Owners can open `/Reports` for sales, product sales, and inventory reports.
 Inventory staff can open `/Reports` for inventory snapshots only. Report CSV and
 print exports use the loaded period/snapshot, including totals or inventory
 counts. Inventory quantities and minimums support three decimal places.
+
+Final hosted verification: `/Auth` responds successfully and the hosted
+`/js/Reports.js` matches the completed repository source.
