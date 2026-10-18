@@ -68,6 +68,10 @@ class POSController extends BaseController
 
     public function checkout()
     {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to checkout.']);
+        }
         $data = $_POST;
 
         if (empty($data['items'])) {
@@ -77,7 +81,7 @@ class POSController extends BaseController
             ]);
         }
 
-        $items = json_decode($data['items'], true);
+        $items = is_string($data['items']) ? json_decode($data['items'], true) : null;
 
         if (!is_array($items) || count($items) === 0) {
             $this->json([
@@ -90,27 +94,17 @@ class POSController extends BaseController
 
         try {
             $result = $this->POS->checkout($data);
-
-            $message = 'Sale completed successfully.';
-            if ($result['loyalty_point_earned']) {
-                $message .= ' 1 loyalty point was added.';
-            } elseif ($result['loyalty_customer']) {
-                $message .= ' The daily loyalty point has already been earned.';
-            }
-
-            $this->json([
-                'status' => 'success',
-                'message' => $message,
-                'sale_id' => $result['sale_id'],
-                'total_amount' => $result['total_amount'],
-                'loyalty_point_earned' => $result['loyalty_point_earned']
-            ]);
-
-        } catch (\Exception $e) {
-            $this->json([
-                'status' => 'error',
-                'message' => $e->getMessage()
-            ]);
+        } catch (\Throwable $e) {
+            $this->json(['status'=>'error','message'=>$e->getMessage()]);
+            return;
         }
+        $message = 'Sale completed successfully.';
+        if ($result['loyalty_point_earned']) $message .= ' 1 loyalty point was added.';
+        elseif ($result['loyalty_customer']) $message .= ' The daily loyalty point has already been earned.';
+        $this->json([
+            'status'=>'success', 'message'=>$message,
+            'sale_id'=>$result['sale_id'], 'total_amount'=>$result['total_amount'],
+            'loyalty_point_earned'=>$result['loyalty_point_earned']
+        ]);
     }
 }

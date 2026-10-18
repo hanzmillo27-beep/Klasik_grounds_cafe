@@ -399,22 +399,19 @@ $(document).ready(function () {
         function handleClearCart(e) {
             e.preventDefault();
 
-            if (!cart.length) {
-                return;
-            }
-
-            isDelete((confirmed) => {
-                if (!confirmed) {
-                    return;
-                }
-
+            function newOrder() {
                 cart = [];
                 kioskOrderId = null;
-
                 clearSavedCart();
-
+                clearSavedCustomerName();
+                $(s.customerName).val('');
+                $('#kiosk-reference-input').val('');
                 renderCart();
-            });
+            }
+            if (!cart.length) { newOrder(); return; }
+            Swal.fire({title: 'Start a new order?', text: 'The current unpaid cart will be cleared.',
+                icon: 'question', showCancelButton: true, confirmButtonText: 'New order'
+            }).then(function (result) { if (result.isConfirmed) newOrder(); });
         }
 
         function handleLoadKioskOrder(e) {

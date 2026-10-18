@@ -117,7 +117,7 @@
                     id="btnClear"
                 >
                     <i class="fas fa-trash"></i>
-                    Clear
+                    New order
                 </button>
 
                 <button

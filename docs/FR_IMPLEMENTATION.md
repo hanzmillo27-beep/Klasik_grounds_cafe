@@ -21,7 +21,7 @@ The earlier audit is retained as the historical baseline.
 | FR-013 | Complete | `php tests/fr_013.php`; reversible deactivation and retained recipes/history; PostgreSQL migration |
 | FR-014 | Complete | `php tests/fr_014.php`; active products only in POS/kiosk menus; management retains inactive records |
 | FR-015 | Complete | `php tests/fr_015.php`; availability controls and server-side POS/kiosk rejection; PostgreSQL migration |
-| FR-016 | Pending | |
+| FR-016 | Complete | `php tests/fr_016.php`; cashier order creation, fresh-order UI, POST/input checks |
 | FR-017 | Pending | |
 | FR-018 | Pending | |
 | FR-019 | Pending | |
