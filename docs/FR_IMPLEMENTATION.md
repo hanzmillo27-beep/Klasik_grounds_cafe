@@ -30,7 +30,7 @@ The earlier audit is retained as the historical baseline.
 | FR-022 | Complete | `php tests/fr_022.php`; trusted saved change, exact/overpayment and live jQuery change preview |
 | FR-023 | Complete | `php tests/fr_023.php`; paid atomic checkout/rollback, retry deduplication, PostgreSQL-compatible loyalty updates |
 | FR-024 | Complete | `php tests/fr_024.php`; receipt opens after paid checkout; saved item snapshots, cashier, paid amount and change; history re-view |
-| FR-025 | Pending | |
+| FR-025 | Complete | `php tests/fr_025.php`; database-generated unique sale IDs, stable receipt/retry identity, deployed primary key confirmed |
 | FR-026 | Pending | |
 | FR-027 | Pending | |
 | FR-028 | Pending | |
