@@ -19,6 +19,7 @@ class Kiosk extends Model
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
+             WHERE p.is_active = TRUE
              ORDER BY p.product_name'
         );
 

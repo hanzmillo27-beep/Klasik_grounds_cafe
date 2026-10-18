@@ -19,7 +19,7 @@ The earlier audit is retained as the historical baseline.
 | FR-011 | Complete | `php tests/fr_011.php`; SQLite and isolated PostgreSQL product/recipe tests |
 | FR-012 | Complete | `php tests/fr_012.php`; SQLite and isolated PostgreSQL update/rollback tests |
 | FR-013 | Complete | `php tests/fr_013.php`; reversible deactivation and retained recipes/history; PostgreSQL migration |
-| FR-014 | Pending | |
+| FR-014 | Complete | `php tests/fr_014.php`; active products only in POS/kiosk menus; management retains inactive records |
 | FR-015 | Pending | |
 | FR-016 | Pending | |
 | FR-017 | Pending | |

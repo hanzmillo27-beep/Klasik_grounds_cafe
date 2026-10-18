@@ -21,6 +21,7 @@ class POS extends Model
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
+             WHERE p.is_active = TRUE
              ORDER BY p.product_name'
         );
 
@@ -42,7 +43,7 @@ class POS extends Model
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
-             WHERE p.product_id = ?'
+             WHERE p.product_id = ? AND p.is_active = TRUE'
         );
 
         $stmt->execute([$id]);
