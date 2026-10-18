@@ -40,8 +40,13 @@ class AuthController extends BaseController{
                 return;
             }
 
-            $username = trim($_POST['username'] ?? '');
+            $username = $_POST['username'] ?? '';
             $password = $_POST['password'] ?? '';
+            if (!is_string($username) || !is_string($password)) {
+                $_SESSION['error'] = 'Enter a valid username and password.';
+                $this->redirect(BASE_URL . '/Auth');
+            }
+            $username = trim($username);
 
             if ($username === '' || $password === '') {
                 $_SESSION['error'] = 'Username and password are required.';

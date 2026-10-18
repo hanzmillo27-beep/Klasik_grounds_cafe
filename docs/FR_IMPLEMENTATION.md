@@ -7,7 +7,7 @@ The earlier audit is retained as the historical baseline.
 | Requirement | Status | Verification |
 | --- | --- | --- |
 | FR-001 | Complete | `php tests/fr_001.php`; jQuery/Bootstrap sign-in popup |
-| FR-002 | Pending | |
+| FR-002 | Complete | `php tests/fr_002.php`; malformed credential validation |
 | FR-003 | Pending | |
 | FR-004 | Pending | |
 | FR-005 | Pending | |
