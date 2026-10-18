@@ -29,7 +29,7 @@ The earlier audit is retained as the historical baseline.
 | FR-021 | Complete | `php tests/fr_021.php`; required validated cash tender, persisted payment, no sale/stock change for insufficient payment |
 | FR-022 | Complete | `php tests/fr_022.php`; trusted saved change, exact/overpayment and live jQuery change preview |
 | FR-023 | Complete | `php tests/fr_023.php`; paid atomic checkout/rollback, retry deduplication, PostgreSQL-compatible loyalty updates |
-| FR-024 | Pending | |
+| FR-024 | Complete | `php tests/fr_024.php`; receipt opens after paid checkout; saved item snapshots, cashier, paid amount and change; history re-view |
 | FR-025 | Pending | |
 | FR-026 | Pending | |
 | FR-027 | Pending | |

@@ -5,7 +5,8 @@ param(
 )
 
 # Offline browser regression for the real POS view and JavaScript.
-# All AJAX is stubbed. Checkout and unrecognized requests fail immediately;
+# All AJAX is stubbed. Only the final receipt test permits one offline checkout;
+# all earlier checkout attempts and unrecognized requests fail immediately.
 # this script never loads app/config/init.php or connects to an application DB.
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -55,7 +56,7 @@ $fixtures = @'
 window.base_url = 'http://pos-fixture.invalid';
 window.__posHarness = {
     generation: String(Date.now()) + Math.random(),
-    errors: [], requests: [], messages: [],
+    errors: [], requests: [], messages: [], allowCheckout: false,
     products: [
         {product_id: 1, product_name: 'Current Americano', product_price: 999, category_name: 'Coffee'},
         {product_id: 2, product_name: 'Current Latte', product_price: 160, category_name: 'Coffee'},
@@ -69,6 +70,14 @@ window.__posHarness = {
         items: [
             {product_id: 1, product_name: 'Original Americano', unit_price: 125.50, quantity: 2, subtotal: 251},
             {product_id: 2, product_name: 'Original Latte', unit_price: 140, quantity: 1, subtotal: 140}
+        ]
+    },
+    receipt: {
+        sale_id: 77, customer_name: 'Browser receipt customer', user_name: 'Browser cashier',
+        sale_date: '2026-10-19 10:00:00', total_amount: 50.30, amount_paid: 100, change_amount: 49.70,
+        items: [
+            {product_id: 4, product_name: 'Fraction A', quantity: 3, unit_price: 0.10, subtotal: 0.30},
+            {product_id: 3, product_name: 'Cookie', quantity: 1, unit_price: 50, subtotal: 50}
         ]
     }
 };
@@ -91,9 +100,34 @@ $.ajax = function (options) {
     else if (path === '/api/Kiosk/claim/KG-BROWSER') {
         response = {status: 'success', data: __posHarness.order};
         delay = 100;
+    } else if (path === '/api/POS/checkout' && __posHarness.allowCheckout) {
+        __posHarness.allowCheckout = false;
+        function requireFixture(condition, message) {
+            if (!condition) { __posHarness.errors.push(message); throw new Error(message); }
+        }
+        requireFixture(options.type === 'POST' && options.data instanceof FormData, 'Checkout must POST FormData.');
+        const data = options.data, expected = __posHarness.expectedCheckout;
+        requireFixture(expected && data.get('amount_paid') === '100.00' && data.get('expected_total') === '50.30',
+            'Checkout did not send the entered payment and displayed total.');
+        requireFixture(data.get('checkout_key') === expected.key && /^[a-zA-Z0-9_-]{8,80}$/.test(expected.key),
+            'Checkout did not send its stable order key.');
+        requireFixture(data.get('customer_name') === 'Browser receipt customer' && !data.has('kiosk_order_id'),
+            'Checkout contains the wrong customer or leftover kiosk context.');
+        const items = JSON.parse(data.get('items'));
+        requireFixture(Array.isArray(items) && items.length === 2
+            && items.every(item => Object.keys(item).sort().join(',') === 'product_id,quantity'),
+            'Checkout must send canonical product IDs and quantities.');
+        const canonical = items.map(item => [Number(item.product_id), Number(item.quantity)]).sort((a,b) => a[0] - b[0]);
+        requireFixture(JSON.stringify(canonical) === '[[3,1],[4,3]]', 'Checkout items differ from the visible cart.');
+        __posHarness.checkoutCaptured = true;
+        response = {status: 'success', message: 'Sale completed successfully.', sale_id: 77,
+            total_amount: 50.30, amount_paid: 100, change_amount: 49.70, loyalty_point_earned: false};
+        delay = 20;
+    } else if (path === '/api/POS/transaction/77' && __posHarness.checkoutCaptured) {
+        response = {status: 'success', data: __posHarness.receipt};
     } else {
         __posHarness.errors.push('Disallowed request: ' + path);
-        throw new Error('Only offline menu, history, and claim fixtures may be requested: ' + path);
+        throw new Error('Only allowlisted offline POS fixtures may be requested: ' + path);
     }
     setTimeout(function () { deferred.resolve(JSON.parse(JSON.stringify(response))); }, delay);
     return deferred.promise();
@@ -184,9 +218,10 @@ function assertCart(expected, total) {
     assert(Math.abs(displayed - total) < 0.001, 'Displayed total differs: ' + displayed + ' versus ' + total);
     assert(document.querySelector('#cart-total').textContent.endsWith(total.toFixed(2)), 'Total must display exactly two decimal places.');
 }
-function assertOffline() {
+function assertOffline(allowedCheckoutCount = 0) {
     assert(!h.errors.length, 'Browser errors: ' + h.errors.join('; '));
-    assert(!h.requests.some(x => x.path.includes('checkout')), 'Checkout must never be requested.');
+    assert(h.requests.filter(x => x.path.includes('checkout')).length === allowedCheckoutCount,
+        'An unexpected checkout request was made.');
 }
 function assertChange(expected) {
     const change = document.querySelector('#payment-change');
@@ -338,6 +373,55 @@ assertOffline();
 return 'Reload preserves edited cart, kiosk context, historical price/name, and customer; New order clears context and payment. No checkout request was made.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $phaseTwo + '})()'))
+    $receiptPhase = @'
+assertCart([], 0);
+click('.btn-add-product[data-id="4"]');
+click('.btn-increase[data-id="4"]');
+click('.btn-increase[data-id="4"]');
+click('.btn-add-product[data-id="3"]');
+assertCart([[4, 3, 0.10], [3, 1, 50]], 50.30);
+$('#customer_name').val('Browser receipt customer').trigger('input');
+$('#amount_paid').val('100.00').trigger('input');
+assertChange(49.70);
+const previousKey = localStorage.getItem('pos_checkout_key');
+h.expectedCheckout = {key: previousKey};
+h.allowCheckout = true;
+click('#btnCheckout');
+assert($('#amount_paid').prop('disabled') && $('#btnCheckout').prop('disabled'), 'Payment controls must lock during checkout.');
+for (let attempt = 0; attempt < 100; attempt++) {
+    if (document.querySelector('#transaction-details h4') && $('#transactionDetailsModal').hasClass('show')) break;
+    await new Promise(r => setTimeout(r, 20));
+}
+assert(h.checkoutCaptured && !h.allowCheckout, 'Exactly one offline checkout fixture must be consumed.');
+assert($('#transactionDetailsModal').hasClass('show'), 'Checkout did not automatically show its receipt modal.');
+assert($('#transactionDetailsModal .modal-title').text().trim() === 'Sales Receipt', 'The modal must identify the sales receipt.');
+const receipt = document.querySelector('#transaction-details');
+assert(receipt.querySelector('h4') && receipt.querySelector('h4').textContent === 'Klasik Grounds Cafe', 'Receipt business header is missing.');
+assert(receipt.textContent.includes('#77') && receipt.textContent.includes('Browser receipt customer')
+    && receipt.textContent.includes('Browser cashier'), 'Receipt transaction, customer, or cashier differs.');
+const lines = receipt.querySelectorAll('tbody tr');
+assert(lines.length === 2, 'Receipt must show both purchased products.');
+const peso = String.fromCharCode(0x20b1);
+assert(Array.from(lines[0].querySelectorAll('td')).map(cell => cell.textContent.trim()).join('|')
+    === 'Fraction A|3|' + peso + '0.10|' + peso + '0.30', 'Receipt decimal-price item differs.');
+assert(Array.from(lines[1].querySelectorAll('td')).map(cell => cell.textContent.trim()).join('|')
+    === 'Cookie|1|' + peso + '50.00|' + peso + '50.00', 'Receipt second item differs.');
+function footer(label) {
+    const row = Array.from(receipt.querySelectorAll('tfoot tr'))
+        .find(row => row.querySelector('th').textContent.trim() === label);
+    assert(row, 'Missing receipt total: ' + label);
+    return row.querySelector('th:last-child').textContent.trim();
+}
+assert(footer('Amount paid') === peso + '100.00' && footer('Change') === peso + '49.70'
+    && footer('Grand Total') === peso + '50.30', 'Receipt payment, change, or total differs.');
+assertCart([], 0);
+assert($('#amount_paid').val() === '' && !$('#amount_paid').prop('disabled') && !$('#btnCheckout').prop('disabled'),
+    'Successful checkout must clear payment and unlock the controls.');
+assert(localStorage.getItem('pos_checkout_key') !== previousKey, 'Successful checkout must start a fresh order key.');
+assertOffline(1);
+return 'One offline checkout sends the visible cart/payment/total/key, clears the cart, and automatically displays a complete sales receipt.';
+'@
+    Write-Output (Evaluate-Js ('(async () => {' + $assertions + $receiptPhase + '})()'))
     Write-Output 'POS browser regression passed using the real PHP view, jQuery, Bootstrap, and POS.js.'
 } finally {
     if ($socket.State -eq [Net.WebSockets.WebSocketState]::Open) {

@@ -619,6 +619,7 @@ $(document).ready(function () {
 
                         loadProducts();
                         loadTransactions();
+                        viewTransaction(res.sale_id);
                     }
                 })
                 .fail((xhr) => {
@@ -724,7 +725,7 @@ $(document).ready(function () {
                                 data-id="${transaction.sale_id}"
                             >
                                 <i class="fa fa-eye mr-1"></i>
-                                View Details
+                                View Receipt
                             </button>
                         </td>
 
@@ -788,6 +789,8 @@ $(document).ready(function () {
             const items = sale.items || [];
 
             $(s.transactionDetails).html(`
+                <h4 class="text-center">Klasik Grounds Cafe</h4>
+                <p class="text-center text-muted">Sales receipt</p>
                 <div class="row mb-4">
 
                     <div class="col-md-6">
@@ -895,6 +898,10 @@ $(document).ready(function () {
                         </tbody>
 
                         <tfoot>
+                            <tr><th colspan="3" class="text-right">Amount paid</th>
+                                <th class="text-right">${sale.amount_paid == null ? 'Not recorded' : formatMoney(sale.amount_paid)}</th></tr>
+                            <tr><th colspan="3" class="text-right">Change</th>
+                                <th class="text-right">${sale.change_amount == null ? 'Not recorded' : formatMoney(sale.change_amount)}</th></tr>
                             <tr>
                                 <th
                                     colspan="3"

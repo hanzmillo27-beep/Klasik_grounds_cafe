@@ -44,7 +44,8 @@ class POSController extends BaseController
 
     public function transaction($id)
     {
-        if (empty($id)) {
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) {
             $this->json([
                 'status' => 'error',
                 'message' => 'Transaction ID is required.'

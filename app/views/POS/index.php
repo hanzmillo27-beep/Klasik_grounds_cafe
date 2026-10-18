@@ -196,14 +196,16 @@
     class="modal fade"
     id="transactionDetailsModal"
     tabindex="-1"
+    role="dialog"
+    aria-labelledby="receipt-title"
     aria-hidden="true"
 >
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
 
             <div class="modal-header">
-                <h5 class="modal-title font-weight-bold">
-                    Transaction Details
+                <h5 id="receipt-title" class="modal-title font-weight-bold">
+                    Sales Receipt
                 </h5>
 
                 <button
