@@ -126,7 +126,7 @@ $(document).ready(function () {
                     searchable: false,
 
                     render: function (data) {
-
+                        if (!$('body').data('manage-products')) return '';
                         return `
                             <button
                                 type="button"

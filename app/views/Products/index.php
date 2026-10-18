@@ -8,6 +8,7 @@
 
         <div class="card-tools ml-auto mt-2 mt-sm-0">
 
+            <?php if (\Core\Auth::canAccess('Products', 'add', 'Api')): ?>
             <button
                 type="button"
                 class="btn btn-primary btn-sm"
@@ -16,6 +17,7 @@
                 <i class="fas fa-plus"></i>
                 New Product
             </button>
+            <?php endif; ?>
 
         </div>
 

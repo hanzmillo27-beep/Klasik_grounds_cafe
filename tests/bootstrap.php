@@ -27,6 +27,13 @@ namespace {
         if (!$condition) throw new \RuntimeException($message);
     }
     class Redirected extends \RuntimeException {}
+    class JsonResponse extends \RuntimeException {
+        public $data;
+        public function __construct($data) { parent::__construct(); $this->data=$data; }
+    }
+    class TestUsersController extends \Api\Users\UsersController {
+        public function json($data): void { throw new JsonResponse($data); }
+    }
     class TestLoginController extends \Controllers\AuthController {
         public function redirect($url): void { throw new Redirected($url); }
     }

@@ -9,7 +9,7 @@ The earlier audit is retained as the historical baseline.
 | FR-001 | Complete | `php tests/fr_001.php`; jQuery/Bootstrap sign-in popup |
 | FR-002 | Complete | `php tests/fr_002.php`; malformed credential validation |
 | FR-003 | Complete | `php tests/fr_003.php`; accessible error and cooldown popup |
-| FR-004 | Pending | |
+| FR-004 | Complete | `php tests/fr_004.php`; role refresh, action permissions, owner protection |
 | FR-005 | Pending | |
 | FR-006 | Pending | |
 | FR-007 | Pending | |

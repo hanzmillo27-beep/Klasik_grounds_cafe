@@ -57,7 +57,7 @@ $(document).ready(function () {
 
                     render: function (data) {
 
-                        return `
+                        var $actions = $('<div>').html(`
                             <button
                                 type="button"
                                 class="btn btn-sm btn-success btn-restock"
@@ -83,7 +83,10 @@ $(document).ready(function () {
                             >
                                 <i class="fas fa-trash"></i>
                             </button>
-                        `;
+                        `);
+                        if (!$('body').data('manage-inventory')) $actions.find('.btn-edit, .btn-delete').remove();
+                        if (!$('body').data('restock-inventory')) $actions.find('.btn-restock').remove();
+                        return $actions.html();
                     }
                 }
 

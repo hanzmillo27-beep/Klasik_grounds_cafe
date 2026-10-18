@@ -24,6 +24,31 @@ class Auth{
         return $_SESSION['user'] ?? null;
     }
 
+    public static function refresh(): void
+    {
+        if (!self::check()) return;
+        $user = (new \Models\Users())->findByID($_SESSION['user']['id'] ?? 0);
+        if (!$user) { unset($_SESSION['user']); return; }
+        $_SESSION['user'] = ['id'=>$user->id, 'username'=>$user->username, 'role'=>$user->role];
+    }
+
+    public static function canAccess(string $resource, string $action = 'index', string $area = 'Controllers'): bool
+    {
+        $role = self::user()['role'] ?? '';
+        $module = strtolower($resource);
+        $action = strtolower($action);
+        if (strtolower($area) === 'api' && $module === 'kiosk' && $action === 'claim') $module = 'pos';
+        $allowed = array_map('strtolower', self::ROLE_ACCESS[$role] ?? []);
+        if ($role === 'owner') return !in_array($module, ['kiosk', 'loyalty'], true);
+        if (!in_array($module, $allowed, true)) return false;
+        if (strtolower($area) === 'api' && in_array($module, ['products', 'inventory'], true)) {
+            if ($role === 'staff' && $module === 'inventory' && $action === 'restock') return true;
+            return in_array($action, ['all', 'categories', 'inventory', 'products', 'product'], true)
+                || ($action === 'edit' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET');
+        }
+        return true;
+    }
+
     public static function requireLogin()
     {
         if (!self::check()) {
@@ -54,7 +79,9 @@ class Auth{
     public static function authorizeRoute(string $area, string $resource, string $action): void
     {
         $area = ucfirst(strtolower($area));
+        $resource = ucfirst(strtolower($resource));
         $action = strtolower($action);
+        self::refresh();
 
         // Authentication and first account registration must be reachable without a session.
         if ($area === 'Controllers' && $resource === 'Auth'
@@ -90,21 +117,7 @@ class Auth{
             self::requireLogin();
         }
 
-        $role = (string) (self::user()['role'] ?? '');
-        $allowedAreas = self::ROLE_ACCESS[$role] ?? [];
-        $modules = array_map('strtolower', $allowedAreas);
-        $module = strtolower($resource);
-
-        // Claiming an order is part of the POS workflow, though its endpoint is under Kiosk.
-        if ($area === 'Api' && $module === 'kiosk' && $action === 'claim') {
-            $module = 'pos';
-        }
-
-        // Owners retain system-wide access except to the customer-facing Kiosk and Loyalty areas.
-        $ownerRestrictedModule = $role === 'owner'
-            && in_array($module, ['kiosk', 'loyalty'], true);
-
-        if ($ownerRestrictedModule || (!in_array('*', $allowedAreas, true) && !in_array($module, $modules, true))) {
+        if (!self::canAccess($resource, $action, $area)) {
             http_response_code(403);
             if ($area === 'Api') {
                 header('Content-Type: application/json');

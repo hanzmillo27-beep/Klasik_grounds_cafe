@@ -42,7 +42,10 @@
 
 </head>
 
-<body class="hold-transition sidebar-mini layout-fixed">
+<body class="hold-transition sidebar-mini layout-fixed"
+      data-manage-products="<?= \Core\Auth::canAccess('Products', 'add', 'Api') ? 'true' : 'false' ?>"
+      data-manage-inventory="<?= \Core\Auth::canAccess('Inventory', 'add', 'Api') ? 'true' : 'false' ?>"
+      data-restock-inventory="<?= \Core\Auth::canAccess('Inventory', 'restock', 'Api') ? 'true' : 'false' ?>">
 <div class="wrapper">
 
       <nav class="main-header navbar navbar-expand navbar-white navbar-light">
@@ -96,6 +99,9 @@
                     <li class="nav-item"><a href="<?= BASE_URL ?>/Users" class="nav-link <?= $title === 'Users' ? 'active' : '' ?>"><i class="nav-icon fas fa-users"></i><p>Users</p></a></li>
                     <?php elseif ($accountRole === 'cashier'): ?>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/POS" class="nav-link <?= $title === 'POS' ? 'active' : '' ?>"><i class="nav-icon fas fa-file-invoice-dollar"></i><p>POS</p></a></li>
+                    <?php elseif ($accountRole === 'staff'): ?>
+                    <li class="nav-item"><a href="<?= BASE_URL ?>/Inventory" class="nav-link <?= $title === 'Inventory' ? 'active' : '' ?>"><i class="nav-icon fas fa-warehouse"></i><p>Inventory</p></a></li>
+                    <li class="nav-item"><a href="<?= BASE_URL ?>/Products" class="nav-link <?= $title === 'Products' ? 'active' : '' ?>"><i class="nav-icon fas fa-pizza-slice"></i><p>Products</p></a></li>
                     <?php elseif (in_array($accountRole, ['user', 'loyal_customer'], true) || !$loggedInUser): ?>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/Kiosk" class="nav-link <?= $title === 'Kiosk' ? 'active' : '' ?>"><i class="nav-icon fas fa-coffee"></i><p>Order</p></a></li>
                     <?php if ($accountRole === 'loyal_customer'): ?>

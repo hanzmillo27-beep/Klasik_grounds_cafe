@@ -60,9 +60,14 @@ class Router
             exit('Controller not found.');
         }
 
-        $controller = new $controllerName();
+        if (!method_exists($controllerName, $action)) {
+            http_response_code(404);
+            exit('Page not found.');
+        }
 
-        if (!method_exists($controller, $action)) {
+        $method = new \ReflectionMethod($controllerName, $action);
+        if (!$method->isPublic() || $method->isStatic() || str_starts_with($action, '__')
+            || $method->getDeclaringClass()->getName() !== $controllerName) {
             http_response_code(404);
             exit('Page not found.');
         }
@@ -71,6 +76,7 @@ class Router
         $resource = $area === 'Api' ? ($parts[1] ?? '') : ($parts[0] ?? 'Dashboard');
         \Core\Auth::authorizeRoute($area, $resource, $action);
 
+        $controller = new $controllerName();
         $controller->$action(...$params);
     }
 }

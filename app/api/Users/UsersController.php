@@ -27,6 +27,11 @@ class UsersController extends BaseController
     public function add()
     {
         $data = $_POST;
+        if (!empty($data['id'])) {
+            http_response_code(400);
+            $this->json(['status'=>'error', 'message'=>'Use the edit action to update an existing account.']);
+        }
+        $this->guardOwnerRole($data['role'] ?? '');
 
         if (empty($data['username'])) {
             $this->json([
@@ -92,6 +97,7 @@ class UsersController extends BaseController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST'){
             $data = $_POST;
+            $this->guardOwnerRole($data['role'] ?? '');
 
             if (empty($data['username'])) {
                 $this->json([
@@ -131,6 +137,14 @@ class UsersController extends BaseController
         }
         $this->json($user);
         
+    }
+
+    private function guardOwnerRole($role): void
+    {
+        if ($role === 'owner' && (Auth::user()['role'] ?? '') !== 'owner') {
+            http_response_code(403);
+            $this->json(['status'=>'error', 'message'=>'Only an owner can assign the owner role.']);
+        }
     }
 
     public function delete($id)
