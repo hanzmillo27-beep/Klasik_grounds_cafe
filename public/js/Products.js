@@ -99,11 +99,12 @@ $(document).ready(function () {
                 },
 
                 {
-                    data: 'product_name'
+                    data: 'product_name', render: $.fn.dataTable.render.text()
                 },
 
                 {
                     data: 'category_name',
+                    render: $.fn.dataTable.render.text(),
                     defaultContent: ''
                 },
 
@@ -116,6 +117,7 @@ $(document).ready(function () {
                     }
                 },
 
+                { data: 'is_active', render: function (active) { return active ? 'Active' : 'Inactive'; } },
                 {
                     data: null,
 
@@ -138,10 +140,11 @@ $(document).ready(function () {
 
                             <button
                                 type="button"
-                                class="btn btn-sm btn-danger btn-delete"
+                                class="btn btn-sm btn-secondary btn-status"
                                 data-id="${data.product_id}"
+                                data-active="${data.is_active ? 0 : 1}"
                             >
-                                <i class="fas fa-trash"></i>
+                                ${data.is_active ? 'Deactivate' : 'Reactivate'}
                             </button>
                         `;
                     }
@@ -489,64 +492,23 @@ $(document).ready(function () {
     });
 
 
-$(document).on(
-    'click',
-    '.btn-delete',
-    function () {
-
-        let id = $(this).data('id');
-
-        isDelete(function (confirmed) {
-
-            if (!confirmed) {
-                return;
-            }
-
-            $.ajax({
-
-                url:
-                    `${base_url}/api/Products/delete/${id}`,
-
-                type: 'POST',
-
-                dataType: 'json',
-
+    $(document).on('click', '.btn-status', function () {
+        const id = $(this).data('id');
+        const active = $(this).data('active');
+        Swal.fire({title: active ? 'Reactivate product?' : 'Deactivate product?',
+            text: 'Existing recipes and transaction records will be retained.',
+            icon: 'question', showCancelButton: true, confirmButtonText: 'Confirm'
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+            $.ajax({url: `${base_url}/api/Products/status/${id}`, type: 'POST',
+                data: {is_active: active}, dataType: 'json',
                 success: function (response) {
-
-                    if (
-                        response.status === 'success'
-                    ) {
-
-                        msgBox('success', response.message);
-
-                        $('#products-table')
-                            .DataTable()
-                            .ajax.reload(
-                                null,
-                                false
-                            );
-
-                    } else {
-
-                        msgBox('error', response.message ||
-                            'Unable to delete product.');
-                    }
-                },
-
-                error: function (xhr) {
-
-                    console.log(
-                        'DELETE ERROR:',
-                        xhr.responseText
-                    );
-
-                    handleAjaxError(xhr);
-                }
+                    msgBox(response.status, response.message);
+                    if (response.status === 'success') table.ajax.reload(null, false);
+                }, error: handleAjaxError
             });
         });
-    }
-);
-
+    });
     $('#products-form').on(
         'submit',
         function (e) {

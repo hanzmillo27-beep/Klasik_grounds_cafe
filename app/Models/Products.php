@@ -17,6 +17,7 @@ class Products extends Model
                 c.category_name,
                 p.product_price,
                 p.product_image,
+                p.is_active,
                 p.created_at
              FROM products p
              LEFT JOIN categories c
@@ -25,6 +26,7 @@ class Products extends Model
         );
         $products = $stmt->fetchAll();
         foreach ($products as $product) {
+            $product->is_active = Users::isActive($product);
             $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
         }
         return $products;
@@ -39,6 +41,7 @@ class Products extends Model
                 p.category_id,
                 p.product_price,
                 p.product_image,
+                p.is_active,
                 p.created_at
              FROM products p
              WHERE p.product_id = ?'
@@ -51,6 +54,7 @@ class Products extends Model
         if (!$product) {
             return null;
         }
+        $product->is_active = Users::isActive($product);
         $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
 
         $stmt = $this->db->prepare(
@@ -272,41 +276,17 @@ class Products extends Model
         return null;
     }
 
-    public function delete($id): bool
-{
-    try {
-
-        $this->db->beginTransaction();
-
-        $stmt = $this->db->prepare(
-            'DELETE FROM product_ingredients
-             WHERE product_id = ?'
-        );
-
-        $stmt->execute([
-            $id
-        ]);
-
-        $stmt = $this->db->prepare(
-            'DELETE FROM products
-             WHERE product_id = ?'
-        );
-
-        $result = $stmt->execute([
-            $id
-        ]);
-
-        $this->db->commit();
-
-        return $result;
-
-    } catch (\Exception $e) {
-
-        if ($this->db->inTransaction()) {
-            $this->db->rollBack();
-        }
-
-        return false;
+    public function setActive($id, bool $active): bool
+    {
+        $stmt = $this->db->prepare('UPDATE products SET is_active = ? WHERE product_id = ?');
+        $stmt->bindValue(1, $active, \PDO::PARAM_BOOL);
+        $stmt->bindValue(2, $id, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->rowCount() === 1;
     }
-}
+
+    public function delete($id): bool
+    {
+        return $this->setActive($id, false);
+    }
 }

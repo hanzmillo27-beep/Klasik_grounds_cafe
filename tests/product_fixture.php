@@ -4,6 +4,8 @@ require_once __DIR__ . '/bootstrap.php';
 $db = Core\Database::$connection;
 $identity = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
     ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+$activeColumn = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+    ? 'BOOLEAN NOT NULL DEFAULT TRUE' : 'INTEGER NOT NULL DEFAULT 1';
 $db->exec('CREATE TABLE categories (
     category_id ' . $identity . ', category_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -17,6 +19,7 @@ $db->exec('CREATE TABLE products (
     product_id ' . $identity . ', product_name VARCHAR(150) NOT NULL,
     category_id INTEGER NOT NULL REFERENCES categories(category_id),
     product_price NUMERIC(10,2) NOT NULL, product_image TEXT,
+    is_active ' . $activeColumn . ',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )');
 $db->exec('CREATE TABLE product_ingredients (

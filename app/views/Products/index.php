@@ -38,6 +38,7 @@
                     <th>Product Name</th>
                     <th>Category</th>
                     <th>Price</th>
+                    <th>Status</th>
                     <th class="text-center">Option</th>
                 </tr>
 
