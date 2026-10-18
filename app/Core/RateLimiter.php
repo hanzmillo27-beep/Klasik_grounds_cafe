@@ -6,21 +6,36 @@ use RuntimeException;
 
 class RateLimiter
 {
+    private const MAX_FAILURES = 5;
+    private const COOLDOWN_SECONDS = 30;
+    private const FAILURE_IDLE_SECONDS = 900;
+
     private string $storagePath;
 
     public function __construct(?string $storagePath = null)
     {
         $this->storagePath = $storagePath ?? sys_get_temp_dir()
-            . '/klasik-rate-limits-' . hash('sha256', __DIR__) . '.json';
+            . '/klasik-login-failures-' . hash('sha256', __DIR__) . '.json';
     }
 
-    /** Count an attempt and return the wait in seconds, or zero when allowed. */
-    public function attempt(string $key, int $limit = 5, int $windowSeconds = 60): int
+    public function retryAfter(string $key): int
     {
-        if ($limit < 1 || $windowSeconds < 1) {
-            throw new \InvalidArgumentException('Rate limit and window must be positive.');
-        }
+        return $this->update($key, 'check');
+    }
 
+    /** The fifth failure starts a 30-second cooldown. */
+    public function recordFailure(string $key): int
+    {
+        return $this->update($key, 'failure');
+    }
+
+    public function reset(string $key): void
+    {
+        $this->update($key, 'reset');
+    }
+
+    private function update(string $key, string $operation): int
+    {
         $file = @fopen($this->storagePath, 'c+');
         if ($file === false) {
             throw new RuntimeException('Unable to open rate limit storage.');
@@ -54,12 +69,18 @@ class RateLimiter
             }
 
             $id = hash('sha256', $key);
-            $bucket = $buckets[$id] ?? ['count' => 0, 'expires' => $now + $windowSeconds];
-            $retryAfter = $bucket['count'] >= $limit ? $bucket['expires'] - $now : 0;
-            if ($retryAfter === 0) {
+            $bucket = $buckets[$id] ?? ['count' => 0, 'expires' => $now + self::FAILURE_IDLE_SECONDS];
+            $retryAfter = $bucket['count'] >= self::MAX_FAILURES ? $bucket['expires'] - $now : 0;
+            if ($operation === 'reset') {
+                unset($buckets[$id]);
+                $retryAfter = 0;
+            } elseif ($operation === 'failure' && $retryAfter === 0) {
                 $bucket['count']++;
+                $bucket['expires'] = $now + ($bucket['count'] >= self::MAX_FAILURES
+                    ? self::COOLDOWN_SECONDS : self::FAILURE_IDLE_SECONDS);
+                $buckets[$id] = $bucket;
+                $retryAfter = $bucket['count'] >= self::MAX_FAILURES ? self::COOLDOWN_SECONDS : 0;
             }
-            $buckets[$id] = $bucket;
 
             $encoded = json_encode($buckets, JSON_THROW_ON_ERROR);
             rewind($file);

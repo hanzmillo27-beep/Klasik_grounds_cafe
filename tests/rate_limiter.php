@@ -17,23 +17,35 @@ $originalServer = $_SERVER;
 
 try {
     $limiter = new RateLimiter($storage);
-    for ($i = 0; $i < 5; $i++) {
-        check($limiter->attempt('login:client-a') === 0, 'Five attempts must be allowed.');
+    for ($i = 0; $i < 10; $i++) {
+        check($limiter->retryAfter('login:client-a') === 0, 'Checking a login must not count as a failure.');
     }
-    $wait = $limiter->attempt('login:client-a');
-    check($wait > 0 && $wait <= 60, 'Sixth attempt must be blocked with a wait time.');
-    check((new RateLimiter($storage))->attempt('login:client-a') > 0, 'A new instance must not reset the counter.');
-    check($limiter->attempt('login:client-b') === 0, 'Different clients must have separate limits.');
+    for ($i = 0; $i < 4; $i++) {
+        check($limiter->recordFailure('login:client-a') === 0, 'The first four failures must not start a cooldown.');
+    }
+    $beforeFifth = time();
+    check($limiter->recordFailure('login:client-a') === 30, 'The fifth failure must start a 30-second cooldown.');
+    $wait = $limiter->retryAfter('login:client-a');
+    check($wait > 0 && $wait <= 30, 'Requests during the cooldown must be blocked.');
+    check((new RateLimiter($storage))->retryAfter('login:client-a') > 0, 'A new instance must not reset the counter.');
+    check($limiter->retryAfter('login:client-b') === 0, 'Different clients must have separate limits.');
 
     $buckets = json_decode(file_get_contents($storage), true);
     $id = hash('sha256', 'login:client-a');
     $expires = $buckets[$id]['expires'];
-    $limiter->attempt('login:client-a');
+    check($expires >= $beforeFifth + 30 && $expires <= time() + 30, 'Cooldown must start at the fifth failure.');
+    $limiter->recordFailure('login:client-a');
     $unchanged = json_decode(file_get_contents($storage), true);
     check($unchanged[$id]['expires'] === $expires, 'Blocked requests must not extend the wait.');
     $buckets[$id]['expires'] = time() - 1;
     file_put_contents($storage, json_encode($buckets));
-    check($limiter->attempt('login:client-a') === 0, 'Attempts must resume after expiry.');
+    check($limiter->retryAfter('login:client-a') === 0, 'Attempts must resume after expiry.');
+    check($limiter->recordFailure('login:client-a') === 0, 'Cooldown expiry must reset the failure count.');
+    $limiter->reset('login:client-a');
+    check($limiter->retryAfter('login:client-a') === 0, 'A successful login must clear failures.');
+    for ($i = 0; $i < 4; $i++) {
+        check($limiter->recordFailure('login:client-a') === 0, 'Failures before success must not carry over.');
+    }
 
     putenv('RENDER');
     $_SERVER['REMOTE_ADDR'] = '192.0.2.1';
@@ -47,18 +59,10 @@ try {
     $_SERVER['HTTP_CF_CONNECTING_IP'] = '2001:db8:0:0:0:0:0:1';
     check(RateLimiter::clientIp() === '2001:db8::1', 'Equivalent IPv6 addresses must use one counter.');
 
-    foreach ([[0, 60], [5, 0]] as [$limit, $seconds]) {
-        try {
-            $limiter->attempt('invalid', $limit, $seconds);
-            throw new RuntimeException('Invalid limits must be rejected.');
-        } catch (InvalidArgumentException $expected) {
-        }
-    }
-
     foreach (['invalid json', '{"bad":null}', '{"bad":{"count":"5","expires":9999999999}}'] as $invalid) {
         file_put_contents($storage, $invalid);
         try {
-            $limiter->attempt('login:client-a');
+            $limiter->retryAfter('login:client-a');
             throw new LogicException('Corrupt storage must not disable the limiter.');
         } catch (RuntimeException $expected) {
             check($expected->getMessage() === 'Unable to read rate limit storage.', 'Storage failure must be reported.');

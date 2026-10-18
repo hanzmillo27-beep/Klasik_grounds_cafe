@@ -157,8 +157,8 @@ Examples:
 
 ### `app/Core/RateLimiter.php`
 
-- Allows five POST requests to `/Auth/login` per client IP in a 60-second window, including successful and incomplete attempts.
-- Excess attempts return HTTP 429 with `Retry-After` and the existing sign-in form. Blocked attempts do not extend the window.
+- Applies only to `/Auth/login`: five failed credential checks from one client IP start a 30-second cooldown. Successful sign-ins clear the counter, and incomplete forms do not count as failed credentials.
+- The fifth failure and requests during the cooldown return HTTP 429 with `Retry-After` and the existing sign-in form. Blocked attempts do not extend the cooldown. Expiry resets the failure count; partial failure counts also expire after 15 minutes without a failure.
 - Uses a locked temporary file shared by PHP workers and browser sessions. Expired counters are removed automatically. Counters are local to one server instance and reset when its temporary storage is cleared, such as during a Render redeploy.
 - On Render, reads Cloudflare's client IP header; locally, uses `REMOTE_ADDR` and ignores forwarded headers.
 - Storage failures return HTTP 503 instead of silently allowing unlimited attempts.
