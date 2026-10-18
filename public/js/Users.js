@@ -147,10 +147,12 @@ const UsersModule = (function () {
             },
             columns: [
                 {
-                    data: 'username'
+                    data: 'username',
+                    render: $.fn.dataTable.render.text()
                 },
                 {
                     data: 'role',
+                    render: $.fn.dataTable.render.text()
                 },
                 {
                     data: 'is_active',
