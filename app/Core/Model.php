@@ -10,4 +10,9 @@ class Model
     {
         $this->db = Database::connect();
     }
+
+    protected function lockClause(): string
+    {
+        return $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+    }
 }

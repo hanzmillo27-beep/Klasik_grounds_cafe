@@ -18,6 +18,7 @@ class Products extends Model
                 p.product_price,
                 p.product_image,
                 p.is_active,
+                p.is_available,
                 p.created_at
              FROM products p
              LEFT JOIN categories c
@@ -27,6 +28,7 @@ class Products extends Model
         $products = $stmt->fetchAll();
         foreach ($products as $product) {
             $product->is_active = Users::isActive($product);
+            $product->is_available = in_array($product->is_available, [true,1,'1','t','true'], true);
             $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
         }
         return $products;
@@ -42,6 +44,7 @@ class Products extends Model
                 p.product_price,
                 p.product_image,
                 p.is_active,
+                p.is_available,
                 p.created_at
              FROM products p
              WHERE p.product_id = ?'
@@ -55,6 +58,7 @@ class Products extends Model
             return null;
         }
         $product->is_active = Users::isActive($product);
+        $product->is_available = in_array($product->is_available, [true,1,'1','t','true'], true);
         $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
 
         $stmt = $this->db->prepare(
@@ -280,6 +284,15 @@ class Products extends Model
     {
         $stmt = $this->db->prepare('UPDATE products SET is_active = ? WHERE product_id = ?');
         $stmt->bindValue(1, $active, \PDO::PARAM_BOOL);
+        $stmt->bindValue(2, $id, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->rowCount() === 1;
+    }
+
+    public function setAvailable($id, bool $available): bool
+    {
+        $stmt = $this->db->prepare('UPDATE products SET is_available = ? WHERE product_id = ?');
+        $stmt->bindValue(1, $available, \PDO::PARAM_BOOL);
         $stmt->bindValue(2, $id, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->rowCount() === 1;

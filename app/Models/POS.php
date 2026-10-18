@@ -21,7 +21,7 @@ class POS extends Model
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
-             WHERE p.is_active = TRUE
+             WHERE p.is_active = TRUE AND p.is_available = TRUE
              ORDER BY p.product_name'
         );
 
@@ -43,7 +43,7 @@ class POS extends Model
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
-             WHERE p.product_id = ? AND p.is_active = TRUE'
+             WHERE p.product_id = ? AND p.is_active = TRUE AND p.is_available = TRUE'
         );
 
         $stmt->execute([$id]);
@@ -191,7 +191,7 @@ class POS extends Model
                         customer_user_id
                      FROM kiosk_orders
                      WHERE kiosk_order_id = ?
-                     FOR UPDATE'
+                     ' . $this->lockClause()
                 );
 
                 $stmt->execute([$kioskOrderId]);
@@ -289,8 +289,8 @@ class POS extends Model
                         product_name,
                         product_price
                      FROM products
-                     WHERE product_id = ?
-                     FOR UPDATE'
+                     WHERE product_id = ? AND is_active = TRUE AND is_available = TRUE
+                     ' . $this->lockClause()
                 );
 
                 $stmt->execute([$productId]);
@@ -299,7 +299,7 @@ class POS extends Model
 
                 if (!$product) {
                     throw new \Exception(
-                        'A product in this order no longer exists. Please review the order.'
+                        'A product in this order is unavailable. Please review the order.'
                     );
                 }
 
@@ -367,7 +367,7 @@ class POS extends Model
                      INNER JOIN inventory i
                         ON i.inv_id = pi.inv_id
                      WHERE pi.product_id = ?
-                     FOR UPDATE'
+                     ' . $this->lockClause()
                 );
 
                 $stmt->execute([$item['product_id']]);

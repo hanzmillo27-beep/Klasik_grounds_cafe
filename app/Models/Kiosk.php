@@ -19,7 +19,7 @@ class Kiosk extends Model
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
-             WHERE p.is_active = TRUE
+             WHERE p.is_active = TRUE AND p.is_available = TRUE
              ORDER BY p.product_name'
         );
 
@@ -62,7 +62,7 @@ class Kiosk extends Model
                 $stmt = $this->db->prepare(
                     'SELECT product_id, product_name, product_price
                      FROM products
-                     WHERE product_id = ?'
+                     WHERE product_id = ? AND is_active = TRUE AND is_available = TRUE'
                 );
                 $stmt->execute([$productId]);
 
@@ -183,7 +183,7 @@ class Kiosk extends Model
                 'SELECT kiosk_order_id, status, claimed_by
                  FROM kiosk_orders
                  WHERE reference_code = ?
-                 FOR UPDATE'
+                 ' . $this->lockClause()
             );
 
             $stmt->execute([strtoupper(trim($reference))]);

@@ -20,6 +20,7 @@ $db->exec('CREATE TABLE products (
     category_id INTEGER NOT NULL REFERENCES categories(category_id),
     product_price NUMERIC(10,2) NOT NULL, product_image TEXT,
     is_active ' . $activeColumn . ',
+    is_available ' . $activeColumn . ',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )');
 $db->exec('CREATE TABLE product_ingredients (

@@ -170,6 +170,24 @@ class ProductsController extends BaseController
         $this->json(['status'=>'success','message'=>$active ? 'Product reactivated.' : 'Product deactivated.']);
     }
 
+    public function availability($id)
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to change availability.']);
+        }
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        $available = $_POST['is_available'] ?? null;
+        if (!$id || $id < 1 || !in_array($available, ['0','1',0,1], true)) {
+            $this->json(['status'=>'error','message'=>'Choose a valid availability.']);
+        }
+        if (!$this->Products->setAvailable($id, (bool) $available)) {
+            http_response_code(404);
+            $this->json(['status'=>'error','message'=>'Product not found.']);
+        }
+        $this->json(['status'=>'success','message'=>$available ? 'Product marked available.' : 'Product marked unavailable.']);
+    }
+
     public function delete($id)
     {
         $_POST['is_active'] = '0';

@@ -118,6 +118,7 @@ $(document).ready(function () {
                 },
 
                 { data: 'is_active', render: function (active) { return active ? 'Active' : 'Inactive'; } },
+                { data: 'is_available', render: function (available) { return available ? 'Available' : 'Unavailable'; } },
                 {
                     data: null,
 
@@ -130,6 +131,10 @@ $(document).ready(function () {
                     render: function (data) {
                         if (!$('body').data('manage-products')) return '';
                         return `
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-availability"
+                                data-id="${data.product_id}" data-available="${data.is_available ? 0 : 1}">
+                                ${data.is_available ? 'Mark unavailable' : 'Mark available'}
+                            </button>
                             <button
                                 type="button"
                                 class="btn btn-sm btn-primary btn-edit"
@@ -509,6 +514,16 @@ $(document).ready(function () {
             });
         });
     });
+    $(document).on('click', '.btn-availability', function () {
+        $.ajax({url: `${base_url}/api/Products/availability/${$(this).data('id')}`, type: 'POST',
+            data: {is_available: $(this).data('available')}, dataType: 'json',
+            success: function (response) {
+                msgBox(response.status, response.message);
+                if (response.status === 'success') table.ajax.reload(null, false);
+            }, error: handleAjaxError
+        });
+    });
+
     $('#products-form').on(
         'submit',
         function (e) {

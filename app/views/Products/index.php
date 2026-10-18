@@ -39,6 +39,7 @@
                     <th>Category</th>
                     <th>Price</th>
                     <th>Status</th>
+                    <th>Availability</th>
                     <th class="text-center">Option</th>
                 </tr>
 
