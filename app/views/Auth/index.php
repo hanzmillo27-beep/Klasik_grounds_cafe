@@ -65,8 +65,8 @@
     <?php endif; ?>
 
     <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-danger kg-alert" role="alert">
-            <?= htmlspecialchars($_SESSION['error']) ?>
+        <div id="login-error" class="alert alert-danger kg-alert" role="alert" tabindex="-1">
+            <?= htmlspecialchars((string) $_SESSION['error'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error']); ?>
     <?php endif; ?>
