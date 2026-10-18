@@ -257,25 +257,23 @@ class POS extends Model
                 !isset($data['items'])
                 || !is_array($data['items'])
                 || count($data['items']) === 0
+                || count($data['items']) > 100
             ) {
                 throw new \Exception('Cart is empty.');
             }
 
             $items = [];
             $total = 0;
+            $seen = [];
 
             foreach ($data['items'] as $item) {
-                $productId = $item['product_id'] ?? null;
-                $quantity = $item['quantity'] ?? 0;
-
-                if (
-                    !is_numeric($productId)
-                    || !is_numeric($quantity)
-                    || (int) $quantity <= 0
-                    || (int) $quantity != $quantity
-                ) {
+                if (!is_array($item)) throw new \Exception('Invalid cart item.');
+                $productId = filter_var($item['product_id'] ?? null, FILTER_VALIDATE_INT);
+                $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
+                if (!$productId || $productId < 1 || !$quantity || $quantity < 1 || $quantity > 99 || isset($seen[$productId])) {
                     throw new \Exception('Invalid cart item.');
                 }
+                $seen[$productId] = true;
 
                 $productId = (int) $productId;
                 $quantity = (int) $quantity;

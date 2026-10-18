@@ -34,7 +34,7 @@ class Kiosk extends Model
     {
         $items = $data['items'] ?? [];
 
-        if (!is_array($items) || !$items) {
+        if (!is_array($items) || !$items || count($items) > 100) {
             throw new \Exception('Your cart is empty.');
         }
 
@@ -43,8 +43,10 @@ class Kiosk extends Model
         try {
             $orderItems = [];
             $total = 0;
+            $seen = [];
 
             foreach ($items as $item) {
+                if (!is_array($item)) throw new \Exception('Invalid product or quantity.');
                 $productId = filter_var(
                     $item['product_id'] ?? null,
                     FILTER_VALIDATE_INT
@@ -55,9 +57,10 @@ class Kiosk extends Model
                     FILTER_VALIDATE_INT
                 );
 
-                if (!$productId || !$quantity || $quantity < 1 || $quantity > 99) {
+                if (!$productId || $productId < 1 || !$quantity || $quantity < 1 || $quantity > 99 || isset($seen[$productId])) {
                     throw new \Exception('Invalid product or quantity.');
                 }
+                $seen[$productId] = true;
 
                 $stmt = $this->db->prepare(
                     'SELECT product_id, product_name, product_price

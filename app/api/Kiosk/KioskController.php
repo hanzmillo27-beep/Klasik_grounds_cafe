@@ -31,7 +31,12 @@ class KioskController extends BaseController
 
     public function submit()
     {
-        $items = json_decode($_POST['items'] ?? '[]', true);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to submit an order.']);
+        }
+        $rawItems = $_POST['items'] ?? '[]';
+        $items = is_string($rawItems) ? json_decode($rawItems, true) : null;
 
         if (!is_array($items) || !$items) {
             $this->json([

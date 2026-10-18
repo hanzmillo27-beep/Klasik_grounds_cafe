@@ -235,6 +235,7 @@ $(document).ready(function () {
             );
 
             if (existing) {
+                if (existing.quantity >= 99) { msgBox('error', 'Maximum quantity is 99 per product.'); return; }
                 existing.quantity++;
             } else {
                 cart.push({
@@ -383,6 +384,7 @@ $(document).ready(function () {
                 return;
             }
 
+            if (item.quantity + amount > 99) { msgBox('error', 'Maximum quantity is 99 per product.'); return; }
             item.quantity += amount;
 
             if (item.quantity <= 0) {
