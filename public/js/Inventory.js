@@ -23,7 +23,7 @@ $(document).ready(function () {
             columns: [
 
                 {
-                    data: 'inv_name'
+                    data: 'inv_name', render: $.fn.dataTable.render.text()
                 },
 
                 {
@@ -36,14 +36,14 @@ $(document).ready(function () {
                                 undefined,
                                 {
                                     minimumFractionDigits: 0,
-                                    maximumFractionDigits: 2
+                                    maximumFractionDigits: 3
                                 }
                             );
                     }
                 },
 
                 {
-                    data: 'unit'
+                    data: 'unit', render: $.fn.dataTable.render.text()
                 },
 
                 {
@@ -422,6 +422,7 @@ $(document).on(
     );
 
 
+    $('#btnRefreshInventory').on('click', function () { table.ajax.reload(null, false); });
     loadInventory();
 
 });

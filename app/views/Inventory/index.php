@@ -7,6 +7,7 @@
         </h3>
 
         <div class="card-tools ml-auto mt-2 mt-sm-0">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshInventory">Refresh stock</button>
 
             <?php if (\Core\Auth::canAccess('Inventory', 'add', 'Api')): ?>
             <button
@@ -35,7 +36,7 @@
 
                 <tr>
                     <th>Name</th>
-                    <th>Amount</th>
+                    <th>Current stock</th>
                     <th>Unit</th>
                     <th class="text-center">Option</th>
                 </tr>
