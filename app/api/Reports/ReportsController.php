@@ -8,12 +8,22 @@ class ReportsController extends BaseController
 {
     public function sales()
     {
+        $this->generate('sales');
+    }
+
+    public function products()
+    {
+        $this->generate('products');
+    }
+
+    private function generate(string $type): void
+    {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
             http_response_code(405);
             $this->json(['status'=>'error','message'=>'Use GET to generate reports.']);
         }
         try {
-            $data = (new Reports())->sales(
+            $data = (new Reports())->$type(
                 array_key_exists('period', $_GET) ? $_GET['period'] : 'daily',
                 array_key_exists('date', $_GET) ? $_GET['date'] : date('Y-m-d')
             );

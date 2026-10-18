@@ -5,6 +5,41 @@ use Core\Model;
 
 class Reports extends Model
 {
+    public function products($period, $value): array
+    {
+        [$start, $end] = $this->period($period, $value);
+        $stmt = $this->db->prepare('SELECT s.sale_id, si.product_id,
+            COALESCE(si.product_name, p.product_name, \'Deleted Product\') AS product_name,
+            si.quantity, si.subtotal FROM sale_items si
+            INNER JOIN sales s ON s.sale_id = si.sale_id
+            LEFT JOIN products p ON p.product_id = si.product_id
+            WHERE s.sale_date >= ? AND s.sale_date < ? ORDER BY s.sale_date, si.sale_item_id');
+        $stmt->execute([$start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s')]);
+        $groups = [];
+        $saleIds = [];
+        $totalCents = 0;
+        $totalQuantity = 0;
+        foreach ($stmt->fetchAll() as $item) {
+            $key = $item->product_id === null ? 'name:' . $item->product_name : 'id:' . $item->product_id;
+            if (!isset($groups[$key])) $groups[$key] = (object) ['product_id'=>$item->product_id === null ? null : (int) $item->product_id,
+                'product_name'=>$item->product_name, 'quantity_sold'=>0, 'cents'=>0];
+            if (strcmp($item->product_name, $groups[$key]->product_name) > 0) $groups[$key]->product_name = $item->product_name;
+            $cents = (int) round((float) $item->subtotal * 100);
+            $groups[$key]->quantity_sold += (int) $item->quantity;
+            $groups[$key]->cents += $cents;
+            $totalCents += $cents;
+            $totalQuantity += (int) $item->quantity;
+            $saleIds[$item->sale_id] = true;
+        }
+        $rows = array_values($groups);
+        foreach ($rows as $row) { $row->total_sales = $row->cents / 100; unset($row->cents); }
+        usort($rows, function ($a, $b) { return $b->total_sales <=> $a->total_sales ?: strcmp($a->product_name, $b->product_name); });
+        $endDate = $end->modify('-1 day')->format('Y-m-d');
+        return ['report_type'=>'products', 'period'=>$period, 'start_date'=>$start->format('Y-m-d'), 'end_date'=>$endDate,
+            'label'=>'Product sales: ' . $start->format('Y-m-d') . ($period === 'daily' ? '' : ' to ' . $endDate),
+            'rows'=>$rows, 'total_quantity'=>$totalQuantity, 'total_amount'=>$totalCents / 100, 'transaction_count'=>count($saleIds)];
+    }
+
     public function sales($period, $value): array
     {
         [$start, $end] = $this->period($period, $value);

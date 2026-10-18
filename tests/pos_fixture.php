@@ -9,7 +9,7 @@ $db->exec('CREATE TABLE sales (
 )');
 $db->exec('CREATE TABLE sale_items (
     sale_item_id ' . $identity . ', sale_id INTEGER NOT NULL REFERENCES sales(sale_id),
-    product_id INTEGER NOT NULL REFERENCES products(product_id), product_name VARCHAR(150),
+    product_id INTEGER REFERENCES products(product_id), product_name VARCHAR(150),
     quantity INTEGER NOT NULL, unit_price NUMERIC(10,2) NOT NULL, subtotal NUMERIC(10,2) NOT NULL
 )');
 $db->exec('CREATE TABLE kiosk_orders (

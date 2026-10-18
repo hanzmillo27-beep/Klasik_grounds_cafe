@@ -58,7 +58,7 @@ $.ajax = function (options) {
     const query = Object.assign(Object.fromEntries(url.searchParams), options.data || {});
     const method = String(options.type || options.method || 'GET').toUpperCase();
     h.requests.push({path: url.pathname, method: method, period: query.period, date: query.date});
-    if (url.pathname !== '/api/Reports/sales' || method !== 'GET' || !['daily', 'weekly', 'monthly'].includes(query.period)) {
+    if (!['/api/Reports/sales', '/api/Reports/products'].includes(url.pathname) || method !== 'GET' || !['daily', 'weekly', 'monthly'].includes(query.period)) {
         h.errors.push('Disallowed report request.'); throw new Error('Only offline daily/weekly/monthly report GETs are allowed.');
     }
     const deferred = $.Deferred(), xhr = deferred.promise();
@@ -68,7 +68,19 @@ $.ajax = function (options) {
         if (xhr.readyState === 0) return;
         xhr.readyState = 4;
         let response;
-        if (query.period === 'monthly') {
+        if (url.pathname === '/api/Reports/products') {
+            const weekly = query.period === 'weekly';
+            if ((!weekly && query.date !== '2026-10-19') || (weekly && query.date !== '2026-W43')) throw new Error('Unexpected product-report fixture period.');
+            response = {status: 'success', data: {report_type: 'products', period: query.period,
+                start_date: '2026-10-19', end_date: weekly ? '2026-10-25' : '2026-10-19',
+                label: 'Product sales: 2026-10-19' + (weekly ? ' to 2026-10-25' : ''),
+                total_quantity: weekly ? 9 : 6, total_amount: weekly ? '230.00' : '130.00',
+                transaction_count: weekly ? 3 : 2, rows: [
+                    {product_id: 1, product_name: '=SUM(1,1)', quantity_sold: weekly ? 6 : 3, total_sales: weekly ? '225.50' : '125.50'},
+                    {product_id: 2, product_name: h.hostile, quantity_sold: 2, total_sales: '0.30'},
+                    {product_id: null, product_name: 'Deleted Product', quantity_sold: 1, total_sales: '4.20'}
+                ]}};
+        } else if (query.period === 'monthly') {
             if (query.date !== '2024-02') throw new Error('Unexpected monthly fixture value.');
             response = {status: 'success', data: {period: 'monthly', start_date: '2024-02-01', end_date: '2024-02-29',
                 label: 'Monthly sales: 2024-02-01 to 2024-02-29', transaction_count: 2, total_amount: '40.40', rows: [
@@ -275,9 +287,56 @@ try {
     await waitFor(() => $('#report-label').text() === 'Daily sales: 2026-10-19' && !$('#generate-sales-report').prop('disabled'), 'Returning to daily reports did not load the selected date.');
     assert($('#report-total').text() === peso + '125.80' && csv.filename() === 'daily-sales-2026-10-19'
         && table.buttons.exportData(csv.exportOptions).footer[4] === '125.80', 'Returning to daily reports retained a weekly export total.');
-    assert(!h.errors.length && h.requests.length === 7
+    const productTable = $('#product-report-table').DataTable();
+    $('#report-type').val('products').trigger('change');
+    assert($('#sales-report-results').prop('hidden') && table.rows().count() === 0 && productTable.rows().count() === 0,
+        'Switching report types must immediately clear old results.');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => productTable.rows().count() === 3 && !$('#generate-sales-report').prop('disabled'), 'Product sales report did not load.');
+    assert(h.requests[7].path === '/api/Reports/products' && h.requests[7].period === 'daily' && h.requests[7].date === '2026-10-19'
+        && $('#sales-report-wrapper').prop('hidden') && !$('#product-report-wrapper').prop('hidden'), 'Product report must use the selected period and its own table.');
+    assert($('#report-label').text() === 'Product sales: 2026-10-19' && $('#report-total').text() === peso + '130.00'
+        && $('#report-count').text() === '2 transactions' && $('#product-footer-quantity').text() === '6', 'Product summary totals differ.');
+    const productRows = productTable.rows().data().toArray();
+    assert(productRows.find(row => row.product_id === 1).quantity_sold === 3
+        && productRows.find(row => row.product_id === null).product_name === 'Deleted Product', 'Product aggregates or historical deleted-product rows were not retained.');
+    assert($('#product-report-table tbody').text().includes(h.hostile) && !$('#product-report-table img').length && !window.__reportInjected,
+        'Product names must display literally.');
+    const productConfigs = productTable.settings()[0]._buttons[0].inst.s.buttons.map(button => button.conf);
+    const productCsv = productConfigs.find(config => config.className.includes('buttons-csv'));
+    const productPrint = productConfigs.find(config => config.className.includes('buttons-print'));
+    const productData = productTable.buttons.exportData(productCsv.exportOptions);
+    assert(productData.body.length === 3 && productData.body.some(row => row[0] === "'=SUM(1,1)" && row[1] === '3' && row[2] === '125.50')
+        && productData.body.some(row => row[0] === h.hostile) && productData.footer[1] === '6' && productData.footer[2] === '130.00'
+        && productData.footer[0] === 'Product sales: 2026-10-19 total' && productCsv.filename() === 'product-sales-daily-2026-10-19',
+        'Product CSV must contain aggregates, literal safe names, and matching quantity/sales totals.');
+    const productPrintData = productTable.buttons.exportData(productPrint.exportOptions);
+    assert(productPrintData.body.some(row => row[0].includes('&lt;img') && !row[0].includes('<img'))
+        && productPrintData.footer[1] === '6' && productPrintData.footer[2] === '130.00'
+        && productPrint.title() === 'Product sales: 2026-10-19', 'Product print configuration must escape names and retain totals.');
+    $('#report-period').val('weekly').trigger('change');
+    assert(productTable.rows().count() === 0 && $('#sales-report-results').prop('hidden'), 'Changing product periods must clear stale results.');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => $('#report-label').text() === 'Product sales: 2026-10-19 to 2026-10-25'
+        && !$('#generate-sales-report').prop('disabled'), 'Weekly product report did not load.');
+    const weeklyProducts = productTable.buttons.exportData(productCsv.exportOptions);
+    assert(h.requests[8].path === '/api/Reports/products' && h.requests[8].date === '2026-W43'
+        && weeklyProducts.footer[1] === '9' && weeklyProducts.footer[2] === '230.00'
+        && $('#report-total').text() === peso + '230.00'
+        && productCsv.filename() === 'product-sales-weekly-2026-10-19-to-2026-10-25', 'Weekly product totals and exports must replace the daily report.');
+    $('#sales-report-form').trigger('submit');
+    $('#report-type').val('sales').trigger('change');
+    await new Promise(resolve => setTimeout(resolve, 60));
+    assert(table.rows().count() === 0 && productTable.rows().count() === 0 && $('#sales-report-results').prop('hidden')
+        && !$('#generate-sales-report').prop('disabled'), 'Changing report type must abort pending data without restoring stale rows.');
+    $('#report-period').val('daily').trigger('change');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => $('#report-label').text() === 'Daily sales: 2026-10-19' && !$('#generate-sales-report').prop('disabled'), 'Sales report did not recover after product reports.');
+    assert(table.rows().count() === 2 && productTable.rows().count() === 0 && !$('#sales-report-wrapper').prop('hidden')
+        && $('#product-report-wrapper').prop('hidden') && $('#report-total').text() === peso + '125.80', 'Switching back must restore only the selected sales report.');
+    assert(!h.errors.length && h.requests.length === 11
         && h.requests.every(request => ['daily', 'weekly', 'monthly'].includes(request.period) && request.method === 'GET'), 'Unexpected browser error or external request.');
-    return 'Daily/weekly/monthly report checks passed: preserved pickers, exact period queries, weekly/leap-month boundaries, totals, safe CSV/print exports, and stale-result clearing. No download or print dialog opened.';
+    return 'Sales/product report checks passed: daily/weekly/monthly periods, aggregates, safe CSV/print totals, picker preservation, and stale/pending result clearing. No download or print dialog opened.';
 })()
 '@
     Write-Output (Evaluate-Js $checks)
