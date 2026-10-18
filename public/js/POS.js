@@ -29,6 +29,7 @@ $(document).ready(function () {
         let kioskOrderId = null;
         let originalKioskItems = [];
         let loadingKiosk = false;
+        let checkingOut = false;
 
         function init() {
             loadSavedCart();
@@ -220,7 +221,7 @@ $(document).ready(function () {
 
         function handleAddProduct(e) {
             e.preventDefault();
-            if (loadingKiosk) return;
+            if (loadingKiosk || checkingOut) return;
 
             const id = $(this).data('id');
 
@@ -327,6 +328,8 @@ $(document).ready(function () {
                                     <button
                                         type="button"
                                         class="btn btn-outline-danger btn-remove"
+                                        aria-label="Remove item from unpaid order"
+                                        title="Remove item"
                                         data-id="${item.product_id}"
                                     >
                                         <i class="fa fa-trash"></i>
@@ -375,6 +378,7 @@ $(document).ready(function () {
 
         function handleRemove(e) {
             e.preventDefault();
+            if (checkingOut) return;
 
             const id = $(this).data('id');
 
@@ -388,6 +392,7 @@ $(document).ready(function () {
         }
 
         function changeQuantity(id, amount) {
+            if (checkingOut) return;
             const item = cart.find(
                 (item) =>
                     Number(item.product_id) === Number(id)
@@ -413,7 +418,7 @@ $(document).ready(function () {
 
         function handleClearCart(e) {
             e.preventDefault();
-            if (loadingKiosk) return;
+            if (loadingKiosk || checkingOut) return;
 
             function newOrder() {
                 cart = [];
@@ -432,7 +437,7 @@ $(document).ready(function () {
 
         function handleLoadKioskOrder(e) {
             e.preventDefault();
-            if (loadingKiosk) return;
+            if (loadingKiosk || checkingOut) return;
 
             const reference = String(
                 $('#kiosk-reference-input').val() || ''
@@ -502,7 +507,7 @@ $(document).ready(function () {
 
         function handleCheckout(e) {
             e.preventDefault();
-            if (loadingKiosk) return;
+            if (loadingKiosk || checkingOut) return;
 
             console.log('Checkout button clicked');
 
@@ -536,6 +541,7 @@ $(document).ready(function () {
             fd.append('kiosk_order_id', kioskOrderId);
 }
 
+            checkingOut = true;
             $(s.checkoutBtn).prop('disabled', true);
 
             $.ajax({
@@ -573,6 +579,7 @@ $(document).ready(function () {
                     handleAjaxError(xhr);
                 })
                 .always(() => {
+                    checkingOut = false;
                     $(s.checkoutBtn).prop('disabled', false);
                 });
         }
