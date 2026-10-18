@@ -11,8 +11,8 @@ $db->exec('CREATE TABLE categories (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )');
 $db->exec('CREATE TABLE inventory (
-    inv_id ' . $identity . ', inv_name VARCHAR(100) NOT NULL,
-    amount NUMERIC(12,3) NOT NULL, unit VARCHAR(20) NOT NULL,
+    inv_id ' . $identity . ', inv_name VARCHAR(150) NOT NULL,
+    amount NUMERIC(12,3) NOT NULL, unit VARCHAR(30) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )');
 $db->exec('CREATE TABLE products (

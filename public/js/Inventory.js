@@ -183,7 +183,7 @@ $(document).ready(function () {
                 .data();
 
             if (!item) {
-                msgBox('Unable to load this inventory item.', 'error');
+                msgBox('error', 'Unable to load this inventory item.');
                 return;
             }
 
@@ -211,7 +211,7 @@ $(document).ready(function () {
             let amount = parseFloat($('#restock-amount').val());
 
             if (!itemId || !Number.isFinite(amount) || amount < 0.001) {
-                msgBox('Enter an amount of at least 0.001 to add.', 'error');
+                msgBox('error', 'Enter an amount of at least 0.001 to add.');
                 return;
             }
 
@@ -226,11 +226,11 @@ $(document).ready(function () {
                 dataType: 'json',
                 success: function (response) {
                     if (response.status === 'success') {
-                        msgBox(response.message, 'success');
+                        msgBox('success', response.message);
                         $('#restock-modal').modal('hide');
                         table.ajax.reload(null, false);
                     } else {
-                        msgBox(response.message || 'Unable to replenish stock.', 'error');
+                        msgBox('error', response.message || 'Unable to replenish stock.');
                     }
                 },
                 error: function (xhr) {
@@ -273,10 +273,7 @@ $(document).on(
                         response.status === 'success'
                     ) {
 
-                        msgBox(
-                            response.message,
-                            'success'
-                        );
+                        msgBox('success', response.message);
 
                         $('#inventory-table')
                             .DataTable()
@@ -287,11 +284,8 @@ $(document).on(
 
                     } else {
 
-                        msgBox(
-                            response.message ||
-                            'Unable to delete inventory item.',
-                            'error'
-                        );
+                        msgBox('error', response.message ||
+                            'Unable to delete inventory item.');
                     }
                 },
 
@@ -322,21 +316,15 @@ $(document).on(
 
             if (!$('#inv_name').val().trim()) {
 
-                msgBox(
-                    'Item name is required.',
-                    'error'
-                );
+                msgBox('error', 'Item name is required.');
 
                 return;
             }
 
 
-            if (!amount || amount <= 0) {
+            if (!Number.isFinite(amount) || amount < 0) {
 
-                msgBox(
-                    'Amount must be greater than zero.',
-                    'error'
-                );
+                msgBox('error', 'Enter a nonnegative quantity.');
 
                 return;
             }
@@ -344,10 +332,7 @@ $(document).on(
 
             if (!$('#unit').val().trim()) {
 
-                msgBox(
-                    'Unit is required.',
-                    'error'
-                );
+                msgBox('error', 'Unit is required.');
 
                 return;
             }
@@ -381,10 +366,7 @@ $(document).on(
                         response.status === 'success'
                     ) {
 
-                        msgBox(
-                            response.message,
-                            'success'
-                        );
+                        msgBox('success', response.message);
 
                         $('#inventory-modal')
                             .modal('hide');
@@ -396,11 +378,8 @@ $(document).on(
 
                     } else {
 
-                        msgBox(
-                            response.message ||
-                            'Request failed.',
-                            'error'
-                        );
+                        msgBox('error', response.message ||
+                            'Request failed.');
                     }
                 },
 

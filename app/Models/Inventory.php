@@ -40,6 +40,10 @@ class Inventory extends Model
 
     public function save($data)
     {
+        if ($this->validationError($data) !== null) return false;
+        $data['inv_name'] = trim($data['inv_name']);
+        $data['unit'] = trim($data['unit']);
+        $data['amount'] = round((float) $data['amount'], 3);
         if (!empty($data['inv_id'])) {
 
             $stmt = $this->db->prepare(
@@ -73,6 +77,22 @@ class Inventory extends Model
             $data['amount'],
             $data['unit'],
         ]);
+    }
+
+    public function validationError(array $data): ?string
+    {
+        if (!is_string($data['inv_name'] ?? null) || trim($data['inv_name']) === '' || strlen(trim($data['inv_name'])) > 150) return 'Enter an item name of up to 150 characters.';
+        if (!is_string($data['unit'] ?? null) || trim($data['unit']) === '' || strlen(trim($data['unit'])) > 30) return 'Enter a unit of up to 30 characters.';
+        $amount = $data['amount'] ?? null;
+        if ((!is_string($amount) && !is_int($amount) && !is_float($amount))
+            || !preg_match('/^\d{1,9}(?:\.\d{1,3})?$/D', (string) $amount)
+            || !is_finite((float) $amount) || $amount > 999999999.999) return 'Enter a nonnegative quantity with at most three decimal places.';
+        $id = $data['inv_id'] ?? null;
+        if ($id !== null && $id !== '' && (!filter_var($id, FILTER_VALIDATE_INT) || $id < 1 || !$this->findByID($id))) return 'Inventory item not found.';
+        $stmt = $this->db->prepare('SELECT inv_id FROM inventory WHERE LOWER(inv_name) = LOWER(?) AND inv_id <> ?');
+        $stmt->execute([trim($data['inv_name']), $id ?: 0]);
+        if ($stmt->fetch()) return 'An inventory item with this name already exists.';
+        return null;
     }
 
     public function restock($id, $amount): bool

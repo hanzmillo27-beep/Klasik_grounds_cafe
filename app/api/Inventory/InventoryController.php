@@ -23,51 +23,22 @@ class InventoryController extends BaseController
 
     public function add()
     {
-        $data = $_POST;
-
-        if (empty($data['inv_name'])) {
-            $this->json([
-                'status' => 'error',
-                'message' => 'Item name is required.'
-            ]);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to save inventory.']);
         }
-
-        if (!isset($data['amount']) || $data['amount'] === '') {
-            $this->json([
-                'status' => 'error',
-                'message' => 'Quantity is required.'
-            ]);
-        }
-
-        if (!is_numeric($data['amount']) || $data['amount'] <= 0) {
-            $this->json([
-                'status' => 'error',
-                'message' => 'Amount must be greater than zero.'
-            ]);
-        }
-
-        if (empty($data['unit'])) {
-            $this->json([
-                'status' => 'error',
-                'message' => 'Quantity unit is required.'
-            ]);
-        }
-
-        if ($this->Inventory->save($data)) {
-            $this->json([
-                'status' => 'success',
-                'message' => empty($data['inv_id'])
-                    ? 'Inventory item added successfully.'
-                    : 'Inventory item updated successfully.'
-            ]);
-        }
-
-        $this->json([
-            'status' => 'error',
-            'message' => 'Unable to save inventory item.'
-        ]);
+        $this->saveItem($_POST);
     }
 
+    private function saveItem(array $data): void
+    {
+        $error = $this->Inventory->validationError($data);
+        if ($error !== null) $this->json(['status'=>'error','message'=>$error]);
+        try { $saved = $this->Inventory->save($data); }
+        catch (\PDOException $error) { $saved = false; }
+        $this->json(['status'=>$saved ? 'success' : 'error',
+            'message'=>$saved ? 'Inventory item saved successfully.' : 'Unable to save inventory item. Check the name is unique.']);
+    }
     public function restock($id)
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -111,64 +82,19 @@ class InventoryController extends BaseController
 
     public function edit($id)
     {
-        $inventory = $this->Inventory->findByID($id);
-
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        $inventory = $id && $id > 0 ? $this->Inventory->findByID($id) : null;
+        if (!$inventory) {
+            http_response_code(404);
+            $this->json(['status'=>'error','message'=>'Inventory item not found.']);
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $data = $_POST;
             $data['inv_id'] = $id;
-
-            if (empty($data['inv_name'])) {
-                $this->json([
-                    'status' => 'error',
-                    'message' => 'Item name is required.'
-                ]);
-            }
-
-            if (!isset($data['amount']) || $data['amount'] === '') {
-                $this->json([
-                    'status' => 'error',
-                    'message' => 'Quantity is required.'
-                ]);
-            }
-
-            if (!is_numeric($data['amount']) || $data['amount'] <= 0) {
-                $this->json([
-                    'status' => 'error',
-                    'message' => 'Amount must be greater than zero.'
-                ]);
-            }
-
-            if (empty($data['unit'])) {
-                $this->json([
-                    'status' => 'error',
-                    'message' => 'Quantity unit is required.'
-                ]);
-            }
-
-            if ($this->Inventory->save($data)) {
-                $this->json([
-                    'status' => 'success',
-                    'message' => 'Inventory item updated successfully.'
-                ]);
-            }
-
-            $this->json([
-                'status' => 'error',
-                'message' => 'Unable to update inventory item.'
-            ]);
+            $this->saveItem($data);
         }
-
-        if (!$inventory) {
-            $this->json([
-                'status' => 'error',
-                'message' => 'Inventory item not found.'
-            ]);
-        }
-
         $this->json($inventory);
     }
-
     public function delete($id)
     {
         if (empty($id)) {

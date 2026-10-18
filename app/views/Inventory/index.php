@@ -141,6 +141,7 @@
                     <input
                         type="text"
                         name="inv_name"
+                        maxlength="150"
                         id="inv_name"
                         class="form-control"
                         placeholder="e.g. Matcha powder"
@@ -165,8 +166,9 @@
                                 name="amount"
                                 id="amount"
                                 class="form-control"
-                                min="0.01"
-                                step="0.01"
+                                min="0"
+                                max="999999999.999"
+                                step="0.001"
                                 placeholder="e.g. 300"
                                 required
                             >
@@ -187,6 +189,7 @@
                             <input
                                 type="text"
                                 name="unit"
+                                maxlength="30"
                                 id="unit"
                                 class="form-control"
                                 placeholder="e.g. g"
