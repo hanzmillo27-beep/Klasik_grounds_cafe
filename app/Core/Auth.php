@@ -28,7 +28,7 @@ class Auth{
     {
         if (!self::check()) return;
         $user = (new \Models\Users())->findByID($_SESSION['user']['id'] ?? 0);
-        if (!$user) { unset($_SESSION['user']); return; }
+        if (!$user || !\Models\Users::isActive($user)) { unset($_SESSION['user']); return; }
         $_SESSION['user'] = ['id'=>$user->id, 'username'=>$user->username, 'role'=>$user->role];
     }
 

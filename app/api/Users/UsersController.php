@@ -185,6 +185,26 @@ class UsersController extends BaseController
 
     public function delete($id)
     {
+        $_POST['is_active'] = '0';
+        $this->status($id);
+    }
+
+    public function status($id)
+    {
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) $this->json(['status'=>'error','message'=>'Invalid user ID.']);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to change account status.']);
+        }
+        $active = $_POST['is_active'] ?? null;
+        if (!in_array($active, ['0','1',0,1], true)) {
+            $this->json(['status'=>'error','message'=>'Choose active or inactive status.']);
+        }
+        $active = (string) $active === '1';
+        if (!$active && (int) $id === (int) (Auth::user()['id'] ?? 0)) {
+            $this->json(['status'=>'error','message'=>'You cannot deactivate your own account.']);
+        }
         if (empty($id)) {
             $this->json([
                 'status' => 'error',
@@ -204,20 +224,20 @@ class UsersController extends BaseController
             http_response_code(403);
             $this->json([
                 'status' => 'error',
-                'message' => 'Only an owner can delete an owner account.'
+                'message' => 'Only an owner can change the status of an owner account.'
             ]);
         }
 
-        if ($this->Users->delete($id)) {
+        if ($this->Users->setActive($id, $active)) {
             $this->json([
                 'status' => 'success',
-                'message' => 'User deleted successfully.'
+                'message' => $active ? 'Account reactivated.' : 'Account deactivated.'
             ]);
         }
 
         $this->json([
             'status' => 'error',
-            'message' => 'Unable to delete user.'
+            'message' => 'Unable to change account status.'
         ]);
     }
 }

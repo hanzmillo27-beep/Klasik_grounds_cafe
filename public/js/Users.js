@@ -25,7 +25,7 @@ const UsersModule = (function () {
     function bindEvents() {
         $(s.newBtn).on('click', showAddModal);
         $(s.table).on('click', '.edit', handleEdit);
-        $(s.table).on('click', '.delete', handleDelete);
+        $(s.table).on('click', '.change-status', handleStatus);
         $(s.form).on('submit', submitForm);
         $(s.modal).on('hidden.bs.modal', resetForm);
     }
@@ -101,17 +101,23 @@ const UsersModule = (function () {
             });
     }
 
-    function handleDelete(e) {
+    function handleStatus(e) {
         e.preventDefault();
 
         const id = $(this).data('id');
-
-        isDelete((confirmed) => {
-            if (!confirmed) return;
+        const active = $(this).data('active');
+        Swal.fire({
+            title: active ? 'Reactivate this account?' : 'Deactivate this account?',
+            text: 'The account and its transaction history will be kept.',
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: active ? 'Reactivate' : 'Deactivate'
+        }).then((result) => {
+            if (!result.value && !result.isConfirmed) return;
 
             $.ajax({
-                url: `${base_url}/api/Users/delete/${id}`,
-                type: 'DELETE',
+                url: `${base_url}/api/Users/status/${id}`,
+                type: 'POST',
+                data: { is_active: active },
                 dataType: 'json'
             })
                 .done((res) => {
@@ -147,6 +153,10 @@ const UsersModule = (function () {
                     data: 'role',
                 },
                 {
+                    data: 'is_active',
+                    render: (active) => active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>'
+                },
+                {
                     data: null,
                     orderable: false,
                     searchable: false,
@@ -156,9 +166,9 @@ const UsersModule = (function () {
                                data-id="${data.id}" title="Edit User">
                                 <i class="fa fa-pen"></i>
                             </a> |
-                            <a href="#" class="text-danger delete"
-                               data-id="${data.id}" title="Delete User">
-                                <i class="fa fa-trash"></i>
+                            <a href="#" class="change-status ${data.is_active ? 'text-warning' : 'text-success'}"
+                               data-id="${data.id}" data-active="${data.is_active ? 0 : 1}" title="${data.is_active ? 'Deactivate' : 'Reactivate'} account">
+                                <i class="fa fa-power-off"></i>
                             </a>
                         </div>`
                 }

@@ -15,6 +15,7 @@
                 <tr>
                     <th>Username</th>
                     <th>Role</th>
+                    <th>Status</th>
                     <th class="text-center">Option</th>
                 </tr>
             </thead>

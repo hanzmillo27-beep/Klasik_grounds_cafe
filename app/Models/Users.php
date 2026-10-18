@@ -9,31 +9,35 @@ class Users extends Model
     public function find()
     {
         $stmt = $this->db->query(
-            'SELECT id, username, role
+            'SELECT id, username, role, is_active
              FROM users
              ORDER BY username'
         );
 
-        return $stmt->fetchAll();
+        $users = $stmt->fetchAll();
+        foreach ($users as $user) $user->is_active = self::isActive($user);
+        return $users;
     }
 
     public function findByID($id)
     {
         $stmt = $this->db->prepare(
-            'SELECT id, username, role
+            'SELECT id, username, role, is_active
              FROM users
              WHERE id = ?'
         );
 
         $stmt->execute([$id]);
 
-        return $stmt->fetch() ?: null;
+        $user = $stmt->fetch();
+        if ($user) $user->is_active = self::isActive($user);
+        return $user ?: null;
     }
 
     public function findByUsername($username)
     {
         $stmt = $this->db->prepare(
-            'SELECT id, username,password, role
+            'SELECT id, username,password, role, is_active
              FROM users
              WHERE username = ?'
         );
@@ -107,10 +111,18 @@ class Users extends Model
 
     public function delete($id): bool
     {
-        $stmt = $this->db->prepare(
-            'DELETE FROM users WHERE id = ?'
-        );
+        return $this->setActive($id, false);
+    }
 
-        return $stmt->execute([$id]);
+    public static function isActive($user): bool {
+        return in_array($user->is_active ?? true, [true, 1, '1', 't', 'true'], true);
+    }
+
+    public function setActive($id, bool $active): bool {
+        $stmt = $this->db->prepare('UPDATE users SET is_active = ?, modified = ? WHERE id = ?');
+        $stmt->bindValue(1, $active, \PDO::PARAM_BOOL);
+        $stmt->bindValue(2, date('Y-m-d H:i:s'));
+        $stmt->bindValue(3, (int) $id, \PDO::PARAM_INT);
+        return $stmt->execute();
     }
 }

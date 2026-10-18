@@ -55,7 +55,7 @@ class AuthController extends BaseController{
 
             $user = (new Users())->findByUsername($username);
             
-            if (!$user || !password_verify($password, $user->password)) {
+            if (!$user || !Users::isActive($user) || !password_verify($password, $user->password)) {
                 try {
                     $retryAfter = $limiter->recordFailure($rateLimitKey);
                 } catch (\RuntimeException $e) {

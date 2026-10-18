@@ -21,7 +21,8 @@ namespace {
     ]);
     \Core\Database::$connection->exec('CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL, role TEXT NOT NULL, created TEXT, modified TEXT
+        password TEXT NOT NULL, role TEXT NOT NULL, created TEXT, modified TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1
     )');
     function check(bool $condition, string $message): void {
         if (!$condition) throw new \RuntimeException($message);
