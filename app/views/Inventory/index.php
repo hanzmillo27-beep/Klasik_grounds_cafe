@@ -77,6 +77,7 @@
                         id="restock-amount"
                         class="form-control"
                         min="0.001"
+                        max="999999999.999"
                         step="0.001"
                         placeholder="Enter resupplied quantity"
                         required

@@ -49,7 +49,8 @@ class InventoryController extends BaseController
             ]);
         }
 
-        $inventory = $this->Inventory->findByID($id);
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        $inventory = $id && $id > 0 ? $this->Inventory->findByID($id) : null;
         if (!$inventory) {
             http_response_code(404);
             $this->json([
@@ -59,17 +60,17 @@ class InventoryController extends BaseController
         }
 
         $amount = $_POST['amount'] ?? '';
-        if (!is_numeric($amount) || !is_finite((float) $amount) || (float) $amount < 0.001) {
+        if (!Inventory::validQuantity($amount, false)) {
             $this->json([
                 'status' => 'error',
-                'message' => 'Amount to add must be at least 0.001.'
+                'message' => 'Enter stock received from 0.001 to 999999999.999, with at most three decimal places.'
             ]);
         }
 
         if (!$this->Inventory->restock($id, $amount)) {
             $this->json([
                 'status' => 'error',
-                'message' => 'Unable to replenish stock.'
+                'message' => 'Unable to replenish stock. Check the item and maximum quantity.'
             ]);
         }
 

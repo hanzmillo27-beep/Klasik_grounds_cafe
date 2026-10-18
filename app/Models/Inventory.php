@@ -84,9 +84,7 @@ class Inventory extends Model
         if (!is_string($data['inv_name'] ?? null) || trim($data['inv_name']) === '' || strlen(trim($data['inv_name'])) > 150) return 'Enter an item name of up to 150 characters.';
         if (!is_string($data['unit'] ?? null) || trim($data['unit']) === '' || strlen(trim($data['unit'])) > 30) return 'Enter a unit of up to 30 characters.';
         $amount = $data['amount'] ?? null;
-        if ((!is_string($amount) && !is_int($amount) && !is_float($amount))
-            || !preg_match('/^\d{1,9}(?:\.\d{1,3})?$/D', (string) $amount)
-            || !is_finite((float) $amount) || $amount > 999999999.999) return 'Enter a nonnegative quantity with at most three decimal places.';
+        if (!self::validQuantity($amount)) return 'Enter a nonnegative quantity with at most three decimal places.';
         $id = $data['inv_id'] ?? null;
         if ($id !== null && $id !== '' && (!filter_var($id, FILTER_VALIDATE_INT) || $id < 1 || !$this->findByID($id))) return 'Inventory item not found.';
         $stmt = $this->db->prepare('SELECT inv_id FROM inventory WHERE LOWER(inv_name) = LOWER(?) AND inv_id <> ?');
@@ -97,13 +95,25 @@ class Inventory extends Model
 
     public function restock($id, $amount): bool
     {
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1 || !self::validQuantity($amount, false)) return false;
+        $amount = number_format((float) $amount, 3, '.', '');
         $stmt = $this->db->prepare(
             'UPDATE inventory
              SET amount = amount + ?
-             WHERE inv_id = ?'
+             WHERE inv_id = ? AND amount <= 999999999.999 - ?'
         );
 
-        return $stmt->execute([$amount, $id]);
+        $stmt->execute([$amount, $id, $amount]);
+        return $stmt->rowCount() === 1;
+    }
+
+    public static function validQuantity($amount, bool $allowZero = true): bool
+    {
+        return (is_string($amount) || is_int($amount) || is_float($amount))
+            && preg_match('/^\d{1,9}(?:\.\d{1,3})?$/D', (string) $amount)
+            && is_finite((float) $amount) && $amount <= 999999999.999
+            && ($allowZero || $amount >= 0.001);
     }
 
     public function delete($id): bool
