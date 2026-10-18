@@ -95,6 +95,7 @@
                     <li class="nav-item"><a href="<?= BASE_URL ?>/DailyExpenses" class="nav-link <?= $title === 'DailyExpenses' ? 'active' : '' ?>"><i class="nav-icon fas fa-money-bill"></i><p>Daily Expenses</p></a></li>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/POS" class="nav-link <?= $title === 'POS' ? 'active' : '' ?>"><i class="nav-icon fas fa-file-invoice-dollar"></i><p>POS</p></a></li>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/Users" class="nav-link <?= $title === 'Users' ? 'active' : '' ?>"><i class="nav-icon fas fa-users"></i><p>Users</p></a></li>
+                    <li class="nav-item"><a href="<?= BASE_URL ?>/Reports" class="nav-link <?= $title === 'Reports' ? 'active' : '' ?>"><i class="nav-icon fas fa-chart-bar"></i><p>Reports</p></a></li>
                     <?php elseif ($accountRole === 'admin'): ?>
                     <li class="nav-item"><a href="<?= BASE_URL ?>/Users" class="nav-link <?= $title === 'Users' ? 'active' : '' ?>"><i class="nav-icon fas fa-users"></i><p>Users</p></a></li>
                     <?php elseif ($accountRole === 'cashier'): ?>
