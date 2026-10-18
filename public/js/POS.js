@@ -27,6 +27,8 @@ $(document).ready(function () {
         let products = [];
         let cart = [];
         let kioskOrderId = null;
+        let originalKioskItems = [];
+        let loadingKiosk = false;
 
         function init() {
             loadSavedCart();
@@ -64,6 +66,9 @@ $(document).ready(function () {
         function loadSavedCart() {
             const savedKioskOrderId = localStorage.getItem(storage.kioskOrderId);
             kioskOrderId = savedKioskOrderId ? Number(savedKioskOrderId) : null;
+            try { originalKioskItems = JSON.parse(localStorage.getItem('pos_kiosk_items') || '[]'); }
+            catch (e) { originalKioskItems = []; }
+            if (!Array.isArray(originalKioskItems)) originalKioskItems = [];
 
             const savedCart = localStorage.getItem(storage.cart);
 
@@ -91,6 +96,7 @@ $(document).ready(function () {
 
             if (kioskOrderId !== null) {
                 localStorage.setItem(storage.kioskOrderId, String(kioskOrderId));
+                localStorage.setItem('pos_kiosk_items', JSON.stringify(originalKioskItems));
             } else {
                 localStorage.removeItem(storage.kioskOrderId);
             }
@@ -122,6 +128,8 @@ $(document).ready(function () {
         function clearSavedCart() {
             localStorage.removeItem(storage.cart);
             localStorage.removeItem(storage.kioskOrderId);
+            localStorage.removeItem('pos_kiosk_items');
+            originalKioskItems = [];
         }
 
         function clearSavedCustomerName() {
@@ -212,6 +220,7 @@ $(document).ready(function () {
 
         function handleAddProduct(e) {
             e.preventDefault();
+            if (loadingKiosk) return;
 
             const id = $(this).data('id');
 
@@ -228,6 +237,10 @@ $(document).ready(function () {
         }
 
         function addToCart(product) {
+            const original = kioskOrderId !== null && originalKioskItems.find(function (item) {
+                return Number(item.product_id) === Number(product.product_id);
+            });
+            if (original) product = $.extend({}, product, {product_name: original.product_name, product_price: original.unit_price});
             const existing = cart.find(
                 (item) =>
                     Number(item.product_id) ===
@@ -400,6 +413,7 @@ $(document).ready(function () {
 
         function handleClearCart(e) {
             e.preventDefault();
+            if (loadingKiosk) return;
 
             function newOrder() {
                 cart = [];
@@ -418,6 +432,7 @@ $(document).ready(function () {
 
         function handleLoadKioskOrder(e) {
             e.preventDefault();
+            if (loadingKiosk) return;
 
             const reference = String(
                 $('#kiosk-reference-input').val() || ''
@@ -433,6 +448,8 @@ $(document).ready(function () {
                 return;
             }
 
+            loadingKiosk = true;
+            $('#btn-load-kiosk-order').prop('disabled', true);
             $.ajax({
                 url: `${base_url}/api/Kiosk/claim/${encodeURIComponent(reference)}`,
                 type: 'POST',
@@ -455,6 +472,7 @@ $(document).ready(function () {
                     return;
                 }
 
+                originalKioskItems = order.items;
                 cart = order.items.map(function (item) {
                     return {
                         product_id: Number(item.product_id),
@@ -467,6 +485,7 @@ $(document).ready(function () {
                 kioskOrderId = Number(order.kiosk_order_id);
 
                 $(s.customerName).val(order.customer_name || '');
+                saveCustomerName();
                 $('#kiosk-reference-input').val(order.reference_code);
 
                 saveCart();
@@ -475,11 +494,15 @@ $(document).ready(function () {
                 msgBox('success', 'Kiosk order loaded. Verify it before checkout.');
             }).fail(function (xhr) {
                 handleAjaxError(xhr);
+            }).always(function () {
+                loadingKiosk = false;
+                $('#btn-load-kiosk-order').prop('disabled', false);
             });
         }
 
         function handleCheckout(e) {
             e.preventDefault();
+            if (loadingKiosk) return;
 
             console.log('Checkout button clicked');
 

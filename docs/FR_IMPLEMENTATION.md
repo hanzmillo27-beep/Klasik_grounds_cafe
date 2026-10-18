@@ -23,7 +23,7 @@ The earlier audit is retained as the historical baseline.
 | FR-015 | Complete | `php tests/fr_015.php`; availability controls and server-side POS/kiosk rejection; PostgreSQL migration |
 | FR-016 | Complete | `php tests/fr_016.php`; cashier order creation, fresh-order UI, POST/input checks |
 | FR-017 | Complete | `php tests/fr_017.php`; multiple products, integer quantities, duplicate/invalid item rejection |
-| FR-018 | Pending | |
+| FR-018 | Complete | `php tests/fr_018.php`; edited POS/kiosk quantities saved; original kiosk prices retained, new items priced by server |
 | FR-019 | Pending | |
 | FR-020 | Pending | |
 | FR-021 | Pending | |

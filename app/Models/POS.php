@@ -159,8 +159,12 @@ class POS extends Model
         try {
             $kioskOrderId = isset($data['kiosk_order_id'])
                 && $data['kiosk_order_id'] !== ''
-                ? (int) $data['kiosk_order_id']
+                ? filter_var($data['kiosk_order_id'], FILTER_VALIDATE_INT)
                 : null;
+            if ($kioskOrderId !== null && (!$kioskOrderId || $kioskOrderId < 1)) throw new \Exception('Invalid kiosk order.');
+            if (!is_string($data['customer_name'] ?? '') || strlen(trim($data['customer_name'] ?? '')) > 100) {
+                throw new \Exception('Customer name must be at most 100 characters.');
+            }
 
             $userId = Auth::user()['id'] ?? null;
 
@@ -239,18 +243,6 @@ class POS extends Model
                     throw new \Exception('The kiosk order has no items.');
                 }
 
-                $data['items'] = [];
-
-                foreach ($kioskItems as $kioskItem) {
-                    $data['items'][] = [
-                        'product_id' => $kioskItem->product_id,
-                        'quantity' => $kioskItem->quantity,
-                        'product_name' => $kioskItem->product_name,
-                        'unit_price' => $kioskItem->unit_price
-                    ];
-                }
-
-                $data['customer_name'] = $kioskOrder->customer_name ?? '';
             }
 
             if (
@@ -305,25 +297,20 @@ class POS extends Model
                  * Regular POS uses the current database price.
                  * Kiosk checkout uses the saved price from the submitted order.
                  */
+                $savedItem = null;
                 if ($kioskOrderId !== null) {
-                    $savedItem = null;
 
                     foreach ($kioskItems as $candidate) {
                         if (
                             (int) $candidate->product_id === $productId
-                            && (int) $candidate->quantity === $quantity
-                            && (string) $candidate->product_name === (string) ($item['product_name'] ?? '')
-                            && (float) $candidate->unit_price === (float) ($item['unit_price'] ?? -1)
                         ) {
                             $savedItem = $candidate;
                             break;
                         }
                     }
 
-                    if (!$savedItem) {
-                        throw new \Exception('Invalid saved kiosk order item.');
-                    }
-
+                }
+                if ($savedItem) {
                     $productName = $savedItem->product_name;
                     $unitPrice = (float) $savedItem->unit_price;
                 } else {
@@ -493,7 +480,7 @@ class POS extends Model
                      SET
                         status = \'completed\',
                         sale_id = ?,
-                        completed_at = NOW()
+                        completed_at = CURRENT_TIMESTAMP
                      WHERE kiosk_order_id = ?
                        AND status = \'claimed\'
                        AND claimed_by = ?'

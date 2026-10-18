@@ -214,7 +214,7 @@ class Kiosk extends Model
 
             $stmt = $this->db->prepare(
                 'UPDATE kiosk_orders
-                 SET status = ?, claimed_by = ?, claimed_at = NOW()
+                 SET status = ?, claimed_by = ?, claimed_at = CURRENT_TIMESTAMP
                  WHERE kiosk_order_id = ? AND status = ?'
             );
 
