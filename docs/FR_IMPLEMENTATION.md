@@ -10,7 +10,7 @@ The earlier audit is retained as the historical baseline.
 | FR-002 | Complete | `php tests/fr_002.php`; malformed credential validation |
 | FR-003 | Complete | `php tests/fr_003.php`; accessible error and cooldown popup |
 | FR-004 | Complete | `php tests/fr_004.php`; role refresh, action permissions, owner protection |
-| FR-005 | Pending | |
+| FR-005 | Complete | `php tests/fr_005.php`; POST logout and destroyed session |
 | FR-006 | Pending | |
 | FR-007 | Pending | |
 | FR-008 | Pending | |

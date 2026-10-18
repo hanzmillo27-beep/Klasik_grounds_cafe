@@ -115,6 +115,12 @@ class AuthController extends BaseController{
 
     public function logout()
     {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            return;
+        }
+        header('Cache-Control: no-store');
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
