@@ -11,6 +11,7 @@ class ReportsController extends BaseController
         Auth::requireLogin();
         $today = (new \DateTimeImmutable('today', new \DateTimeZone('Asia/Manila')))->format('Y-m-d');
         $week = (new \DateTimeImmutable('today', new \DateTimeZone('Asia/Manila')))->format('o-\WW');
-        $this->view('Reports/index', ['title'=>'Reports', 'today'=>$today, 'week'=>$week]);
+        $month = substr($today, 0, 7);
+        $this->view('Reports/index', ['title'=>'Reports', 'today'=>$today, 'week'=>$week, 'month'=>$month]);
     }
 }

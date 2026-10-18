@@ -52,7 +52,7 @@ $(document).ready(function () {
             {extend: 'csvHtml5', text: 'Export CSV', footer: true, bom: true,
                 filename: function () {
                     return report ? report.period + '-sales-' + report.start_date
-                        + (report.period === 'weekly' ? '-to-' + report.end_date : '') : 'sales-report';
+                        + (report.period === 'daily' ? '' : '-to-' + report.end_date) : 'sales-report';
                 },
                 exportOptions: exportOptions(false)},
             {extend: 'print', text: 'Print report', footer: true,
@@ -81,9 +81,10 @@ $(document).ready(function () {
         clearReport();
         $('#report-error').text('').prop('hidden', true);
         const period = $('#report-period').val();
-        const date = $(period === 'weekly' ? '#report-week' : '#report-date').val();
+        const date = $(period === 'weekly' ? '#report-week' : period === 'monthly' ? '#report-month' : '#report-date').val();
         if (!date || !$('#sales-report-form')[0].checkValidity()) {
-            showError(period === 'weekly' ? 'Choose a valid report week.' : 'Choose a valid report date.');
+            showError(period === 'weekly' ? 'Choose a valid report week.'
+                : period === 'monthly' ? 'Choose a valid report month.' : 'Choose a valid report date.');
             $('#generate-sales-report').prop('disabled', false);
             return;
         }
@@ -118,11 +119,13 @@ $(document).ready(function () {
             });
     }
     function updatePeriodFields() {
-        const weekly = $('#report-period').val() === 'weekly';
-        $('#report-date').prop('disabled', weekly).prop('required', !weekly);
-        $('#report-week').prop('disabled', !weekly).prop('required', weekly);
-        $('#report-date-field').prop('hidden', weekly);
-        $('#report-week-field').prop('hidden', !weekly);
+        const period = $('#report-period').val();
+        $('#report-date').prop('disabled', period !== 'daily').prop('required', period === 'daily');
+        $('#report-week').prop('disabled', period !== 'weekly').prop('required', period === 'weekly');
+        $('#report-month').prop('disabled', period !== 'monthly').prop('required', period === 'monthly');
+        $('#report-date-field').prop('hidden', period !== 'daily');
+        $('#report-week-field').prop('hidden', period !== 'weekly');
+        $('#report-month-field').prop('hidden', period !== 'monthly');
     }
     $('#report-period').on('change', updatePeriodFields);
     $('#sales-report-form').on('submit', function (event) { event.preventDefault(); loadReport(); });

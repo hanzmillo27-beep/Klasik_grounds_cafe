@@ -26,6 +26,15 @@ class Reports extends Model
 
     private function period($period, $value): array
     {
+        if ($period === 'monthly') {
+            if (!is_string($value) || !preg_match('/^(\d{4})-(\d{2})$/D', $value, $match)
+                || (int) $match[1] < 1000 || (int) $match[1] > 9998) {
+                throw new \InvalidArgumentException('Choose a valid report month.');
+            }
+            $start = \DateTimeImmutable::createFromFormat('!Y-m-d', $value . '-01', new \DateTimeZone('Asia/Manila'));
+            if (!$start || $start->format('Y-m') !== $value) throw new \InvalidArgumentException('Choose a valid report month.');
+            return [$start, $start->modify('+1 month')];
+        }
         if ($period === 'weekly') {
             if (!is_string($value) || !preg_match('/^(\d{4})-W(\d{2})$/D', $value, $match)
                 || (int) $match[1] < 1001 || (int) $match[1] > 9997) {

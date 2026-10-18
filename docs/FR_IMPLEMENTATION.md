@@ -38,6 +38,6 @@ The earlier audit is retained as the historical baseline.
 | FR-030 | Complete | `php tests/fr_030.php`; per-item minimums and inclusive low-stock boundaries across Inventory/Dashboard; PostgreSQL migration |
 | FR-031 | Complete | `php tests/fr_031.php` SQLite/PostgreSQL; owner daily report, selected-day boundaries, totals and CSV/print UI |
 | FR-032 | Complete | `php tests/fr_032.php`; selected ISO weeks, Monday/Sunday boundaries and cross-year reports with CSV/print |
-| FR-033 | Pending | |
+| FR-033 | Complete | `php tests/fr_033.php`; selected monthly reports, leap years, month/year boundaries and matching exports |
 | FR-034 | Pending | |
 | FR-035 | Pending | |

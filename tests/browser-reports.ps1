@@ -27,7 +27,7 @@ $htmlPath = Join-Path $artifactDirectory 'reports.html'
 $rendererPath = Join-Path $artifactDirectory 'render-reports.php'
 $profilePath = Join-Path $artifactDirectory 'edge-profile'
 $viewPath = (Join-Path $projectRoot 'app/views/Reports/index.php').Replace('\', '/').Replace("'", "\'")
-$phpRenderer = '<?php $today = ''2026-10-19''; $week = ''2026-W43''; require ''' + $viewPath + ''';'
+$phpRenderer = '<?php $today = ''2026-10-19''; $week = ''2026-W43''; $month = ''2026-10''; require ''' + $viewPath + ''';'
 [IO.File]::WriteAllText($rendererPath, $phpRenderer, [Text.UTF8Encoding]::new($false))
 $renderedView = (& $PhpPath -f $rendererPath | Out-String)
 if ($LASTEXITCODE -ne 0) { throw 'Rendering the reports view failed.' }
@@ -58,8 +58,8 @@ $.ajax = function (options) {
     const query = Object.assign(Object.fromEntries(url.searchParams), options.data || {});
     const method = String(options.type || options.method || 'GET').toUpperCase();
     h.requests.push({path: url.pathname, method: method, period: query.period, date: query.date});
-    if (url.pathname !== '/api/Reports/sales' || method !== 'GET' || !['daily', 'weekly'].includes(query.period)) {
-        h.errors.push('Disallowed report request.'); throw new Error('Only offline daily/weekly report GETs are allowed.');
+    if (url.pathname !== '/api/Reports/sales' || method !== 'GET' || !['daily', 'weekly', 'monthly'].includes(query.period)) {
+        h.errors.push('Disallowed report request.'); throw new Error('Only offline daily/weekly/monthly report GETs are allowed.');
     }
     const deferred = $.Deferred(), xhr = deferred.promise();
     xhr.readyState = 1;
@@ -68,7 +68,16 @@ $.ajax = function (options) {
         if (xhr.readyState === 0) return;
         xhr.readyState = 4;
         let response;
-        if (query.period === 'weekly') {
+        if (query.period === 'monthly') {
+            if (query.date !== '2024-02') throw new Error('Unexpected monthly fixture value.');
+            response = {status: 'success', data: {period: 'monthly', start_date: '2024-02-01', end_date: '2024-02-29',
+                label: 'Monthly sales: 2024-02-01 to 2024-02-29', transaction_count: 2, total_amount: '40.40', rows: [
+                    {sale_id: 20, sale_date: '2024-02-01 00:00:00', customer_name: 'First day', user_name: 'Owner',
+                        total_amount: '10.10', amount_paid: '20.00', change_amount: '9.90'},
+                    {sale_id: 21, sale_date: '2024-02-29 23:59:59', customer_name: 'Leap day', user_name: 'Owner',
+                        total_amount: '30.30', amount_paid: '40.00', change_amount: '9.70'}
+                ]}};
+        } else if (query.period === 'weekly') {
             if (query.date !== '2026-W43') throw new Error('Unexpected weekly fixture value.');
             response = {status: 'success', data: {period: 'weekly', start_date: '2026-10-19', end_date: '2026-10-25',
                 label: 'Weekly sales: 2026-10-19 to 2026-10-25', transaction_count: 2, total_amount: '30.30', rows: [
@@ -178,7 +187,8 @@ try {
     const peso = String.fromCharCode(0x20b1);
     assert($('#report-date').val() === '2026-10-19' && h.requests[0].date === '2026-10-19', 'Initial report must use the server-supplied date.');
     assert($('#report-period').val() === 'daily' && !$('#report-date').prop('disabled') && $('#report-date').prop('required')
-        && $('#report-week').prop('disabled') && !$('#report-week').prop('required'), 'Only the daily picker must be active initially.');
+        && $('#report-week').prop('disabled') && !$('#report-week').prop('required')
+        && $('#report-month').prop('disabled') && !$('#report-month').prop('required'), 'Only the daily picker must be active initially.');
     assert(!$('#sales-report-results').prop('hidden') && $('#report-total').text() === peso + '125.80'
         && $('#report-count').text() === '2 transactions', 'Daily report summary differs from its rows.');
     assert($('#sales-report-table tbody').text().includes(h.hostile)
@@ -216,7 +226,8 @@ try {
     $('#report-period').val('weekly').trigger('change');
     assert($('#report-date').prop('disabled') && !$('#report-date').prop('required')
         && !$('#report-week').prop('disabled') && $('#report-week').prop('required')
-        && $('#report-week').val() === '2026-W43', 'Weekly selection must activate only the ISO-week picker and preserve its default.');
+        && $('#report-week').val() === '2026-W43' && $('#report-month').prop('disabled')
+        && !$('#report-month').prop('required'), 'Weekly selection must activate only the ISO-week picker and preserve its default.');
     $('#sales-report-form').trigger('submit');
     await waitFor(() => table.rows().count() === 2 && !$('#generate-sales-report').prop('disabled'), 'Weekly report did not load.');
     assert(h.requests[3].period === 'weekly' && h.requests[3].date === '2026-W43'
@@ -228,18 +239,45 @@ try {
         && weekly.footer[0] === 'Weekly sales: 2026-10-19 to 2026-10-25 total'
         && csv.filename() === 'weekly-sales-2026-10-19-to-2026-10-25'
         && print.title() === 'Weekly sales: 2026-10-19 to 2026-10-25', 'Weekly exports must use the loaded week and its exact total.');
+    $('#report-period').val('monthly').trigger('change');
+    assert($('#report-month').attr('type') === 'month' && $('#report-month').val() === '2026-10'
+        && !$('#report-month').prop('disabled') && $('#report-month').prop('required')
+        && $('#report-date').prop('disabled') && !$('#report-date').prop('required')
+        && $('#report-week').prop('disabled') && !$('#report-week').prop('required'), 'Only the monthly picker must be active in monthly mode.');
+    $('#report-month').val('2024-02');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => $('#report-label').text() === 'Monthly sales: 2024-02-01 to 2024-02-29'
+        && !$('#generate-sales-report').prop('disabled'), 'Leap-month report did not load.');
+    assert(h.requests[4].period === 'monthly' && h.requests[4].date === '2024-02'
+        && $('#report-total').text() === peso + '40.40', 'Monthly query or total differs.');
+    const monthly = table.buttons.exportData(csv.exportOptions);
+    assert(monthly.body.length === 2 && monthly.body[0][1] === '2024-02-01 00:00:00'
+        && monthly.body[1][1] === '2024-02-29 23:59:59' && monthly.footer[4] === '40.40'
+        && monthly.footer[0] === 'Monthly sales: 2024-02-01 to 2024-02-29 total'
+        && csv.filename() === 'monthly-sales-2024-02-01-to-2024-02-29'
+        && print.title() === 'Monthly sales: 2024-02-01 to 2024-02-29', 'Monthly exports must include the leap-day boundary and loaded total.');
+    $('#report-period').val('weekly').trigger('change');
+    assert($('#report-month').val() === '2024-02' && $('#report-month').prop('disabled')
+        && !$('#report-month').prop('required') && $('#report-week').val() === '2026-W43', 'Switching from monthly must preserve both month and week selections.');
+    $('#sales-report-form').trigger('submit');
+    await waitFor(() => $('#report-label').text() === 'Weekly sales: 2026-10-19 to 2026-10-25'
+        && !$('#generate-sales-report').prop('disabled'), 'Weekly report did not recover after monthly selection.');
+    assert($('#report-total').text() === peso + '30.30' && table.buttons.exportData(csv.exportOptions).footer[4] === '30.30',
+        'Returning to weekly must replace monthly totals and exports.');
     $('#report-period').val('daily').trigger('change');
     assert($('#report-date').val() === '2026-10-21' && $('#report-week').val() === '2026-W43'
         && !$('#report-date').prop('disabled') && $('#report-date').prop('required')
-        && $('#report-week').prop('disabled') && !$('#report-week').prop('required'), 'Switching back must preserve both picker values and validate only the daily date.');
+        && $('#report-week').prop('disabled') && !$('#report-week').prop('required')
+        && $('#report-month').val() === '2024-02' && $('#report-month').prop('disabled')
+        && !$('#report-month').prop('required'), 'Switching back must preserve all picker values and validate only the daily date.');
     $('#report-date').val('2026-10-19');
     $('#sales-report-form').trigger('submit');
     await waitFor(() => $('#report-label').text() === 'Daily sales: 2026-10-19' && !$('#generate-sales-report').prop('disabled'), 'Returning to daily reports did not load the selected date.');
     assert($('#report-total').text() === peso + '125.80' && csv.filename() === 'daily-sales-2026-10-19'
         && table.buttons.exportData(csv.exportOptions).footer[4] === '125.80', 'Returning to daily reports retained a weekly export total.');
-    assert(!h.errors.length && h.requests.length === 5
-        && h.requests.every(request => ['daily', 'weekly'].includes(request.period) && request.method === 'GET'), 'Unexpected browser error or external request.');
-    return 'Daily/weekly report checks passed: picker switching, exact date/week queries and boundaries, rows/count/total, safe CSV/print exports, and stale-result clearing on error. No download or print dialog opened.';
+    assert(!h.errors.length && h.requests.length === 7
+        && h.requests.every(request => ['daily', 'weekly', 'monthly'].includes(request.period) && request.method === 'GET'), 'Unexpected browser error or external request.');
+    return 'Daily/weekly/monthly report checks passed: preserved pickers, exact period queries, weekly/leap-month boundaries, totals, safe CSV/print exports, and stale-result clearing. No download or print dialog opened.';
 })()
 '@
     Write-Output (Evaluate-Js $checks)

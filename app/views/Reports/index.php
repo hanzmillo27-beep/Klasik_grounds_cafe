@@ -6,7 +6,7 @@
         <form id="sales-report-form" class="form-inline mb-3">
             <label for="report-period" class="mr-2">Period</label>
             <select id="report-period" class="form-control mr-sm-3 mb-2 mb-sm-0">
-                <option value="daily">Daily</option><option value="weekly">Weekly</option>
+                <option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
             </select>
             <span id="report-date-field" class="form-inline">
                 <label for="report-date" class="mr-2">Sales date</label>
@@ -17,6 +17,11 @@
                 <label for="report-week" class="mr-2">Sales week</label>
                 <input type="week" id="report-week" class="form-control mr-sm-2 mb-2 mb-sm-0"
                     value="<?= htmlspecialchars($week, ENT_QUOTES, 'UTF-8') ?>" disabled>
+            </span>
+            <span id="report-month-field" class="form-inline" hidden>
+                <label for="report-month" class="mr-2">Sales month</label>
+                <input type="month" id="report-month" class="form-control mr-sm-2 mb-2 mb-sm-0" min="1000-01" max="9998-12"
+                    value="<?= htmlspecialchars($month, ENT_QUOTES, 'UTF-8') ?>" disabled>
             </span>
             <button type="submit" id="generate-sales-report" class="btn btn-primary">Generate report</button>
         </form>
