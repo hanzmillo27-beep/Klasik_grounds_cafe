@@ -14,7 +14,7 @@ The earlier audit is retained as the historical baseline.
 | FR-006 | Complete | `php tests/fr_006.php`; validated account creation and duplicate checks |
 | FR-007 | Complete | `php tests/fr_007.php`; safe targeted updates and password retention |
 | FR-008 | Complete | `php tests/fr_008.php`; migration `008_user_status.sql`; deactivate/reactivate |
-| FR-009 | Pending | |
+| FR-009 | Complete | `php tests/fr_009.php`; shared role list and PostgreSQL role constraint |
 | FR-010 | Pending | |
 | FR-011 | Pending | |
 | FR-012 | Pending | |

@@ -19,6 +19,8 @@ class Auth{
         return !empty($_SESSION['user']);
     }
 
+    public static function roles(): array { return array_keys(self::ROLE_ACCESS); }
+
     public static function user()
     {
         return $_SESSION['user'] ?? null;

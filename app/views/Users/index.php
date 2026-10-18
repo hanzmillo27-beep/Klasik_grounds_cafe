@@ -52,7 +52,9 @@
                         <label for="role">Role</label>
                         <select name="role" id="role" class="form-control">
                             <option value="user">User</option>
+                            <?php if ((\Core\Auth::user()['role'] ?? '') === 'owner'): ?>
                             <option value="owner">Owner</option>
+                            <?php endif; ?>
                             <option value="admin">Administrator</option>
                             <option value="cashier">Cashier</option>
                             <option value="staff">Staff</option>

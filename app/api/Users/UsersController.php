@@ -8,8 +8,6 @@ use Models\Users;
 
 class UsersController extends BaseController
 {
-    private const ROLES = ['owner', 'admin', 'cashier', 'user', 'loyal_customer'];
-
     private $Users;
 
     public function __construct()
@@ -68,7 +66,7 @@ class UsersController extends BaseController
             ]);
         }
 
-        if (!in_array($data['role'], self::ROLES, true)) {
+        if (!in_array($data['role'], Auth::roles(), true)) {
             $this->json([
                 'status' => 'error',
                 'message' => 'Invalid role.'
@@ -145,7 +143,7 @@ class UsersController extends BaseController
                 ]);
             }
 
-            if (!in_array($data['role'], self::ROLES, true)) {
+            if (!in_array($data['role'], Auth::roles(), true)) {
                 $this->json([
                     'status' => 'error',
                     'message' => 'Invalid role.'
