@@ -148,7 +148,7 @@ class Dashboard extends Model
             'SELECT
                 expense_id,
                 expense_name,
-                amount, min_stock,
+                amount,
                 expense_date
              FROM daily_expenses
              ORDER BY expense_date DESC, expense_id DESC
