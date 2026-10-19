@@ -19,6 +19,7 @@ class Products extends Model
                 p.product_image,
                 p.is_active,
                 p.is_available,
+                ' . ProductAvailability::stockSql() . ' AS stock_available,
                 p.created_at
              FROM products p
              LEFT JOIN categories c
@@ -27,8 +28,7 @@ class Products extends Model
         );
         $products = $stmt->fetchAll();
         foreach ($products as $product) {
-            $product->is_active = Users::isActive($product);
-            $product->is_available = in_array($product->is_available, [true,1,'1','t','true'], true);
+            ProductAvailability::apply($product);
             $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
         }
         return $products;
@@ -45,6 +45,7 @@ class Products extends Model
                 p.product_image,
                 p.is_active,
                 p.is_available,
+                ' . ProductAvailability::stockSql() . ' AS stock_available,
                 p.created_at
              FROM products p
              WHERE p.product_id = ?'
@@ -57,8 +58,7 @@ class Products extends Model
         if (!$product) {
             return null;
         }
-        $product->is_active = Users::isActive($product);
-        $product->is_available = in_array($product->is_available, [true,1,'1','t','true'], true);
+        ProductAvailability::apply($product);
         $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
 
         $stmt = $this->db->prepare(

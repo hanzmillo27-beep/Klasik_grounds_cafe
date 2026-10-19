@@ -62,7 +62,9 @@ window.__posHarness = {
         {product_id: 2, product_name: 'Current Latte', product_price: 160, category_name: 'Coffee'},
         {product_id: 3, product_name: 'Cookie', product_price: 50, category_name: 'Food'},
         {product_id: 4, product_name: 'Fraction A', product_price: 0.10, category_name: 'Test fractions'},
-        {product_id: 5, product_name: 'Fraction B', product_price: 0.20, category_name: 'Test fractions'}
+        {product_id: 5, product_name: 'Fraction B', product_price: 0.20, category_name: 'Test fractions'},
+        {product_id: 6, product_name: 'Stock-short drink', product_price: 5, category_name: 'Coffee',
+            is_available: true, stock_available: false, can_order: false, availability_reason: '<b>Not enough beans</b>'}
     ],
     order: {
         kiosk_order_id: 42, reference_code: 'KG-BROWSER', status: 'claimed',
@@ -95,7 +97,7 @@ $.ajax = function (options) {
     var deferred = $.Deferred(), path = new URL(options.url).pathname;
     __posHarness.requests.push({path: path, method: options.type || 'GET'});
     var response, delay = 0;
-    if (path === '/api/POS/products') response = {data: __posHarness.products};
+    if (path === '/api/POS/products' || path === '/api/Kiosk/products') response = {data: __posHarness.products};
     else if (path === '/api/POS/transactions') response = {data: []};
     else if (path === '/api/Kiosk/claim/KG-BROWSER') {
         response = {status: 'success', data: __posHarness.order};
@@ -146,6 +148,15 @@ $renderedView
 </body></html>
 "@
 Set-Content -LiteralPath $htmlPath -Encoding UTF8 -Value $html
+$kioskRendererPath = Join-Path $artifactDirectory 'render-kiosk.php'
+$kioskHtmlPath = Join-Path $artifactDirectory 'kiosk.html'
+$kioskViewPath = (Join-Path $projectRoot 'app/views/Kiosk/index.php').Replace('\', '/').Replace("'", "\'")
+$kioskRenderer = '<?php define(''BASE_URL'', ''http://pos-fixture.invalid''); $username = ''''; $isLoyalCustomer = false; require ''' + $kioskViewPath + ''';'
+[IO.File]::WriteAllText($kioskRendererPath, $kioskRenderer, [Text.UTF8Encoding]::new($false))
+$kioskView = (& $PhpPath -f $kioskRendererPath | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'Rendering the offline kiosk view failed.' }
+$kioskUri = Asset-Uri 'public/js/Kiosk.js'
+Set-Content -LiteralPath $kioskHtmlPath -Encoding UTF8 -Value ($html.Replace($renderedView, $kioskView).Replace($posUri, $kioskUri))
 
 $socket = New-Object Net.WebSockets.ClientWebSocket
 $browserProcess = $null
@@ -204,6 +215,10 @@ function click(selector) {
     button.click();
 }
 function cart() { return JSON.parse(localStorage.getItem('pos_cart') || '[]'); }
+async function waitFor(condition, message) {
+    for (let attempt = 0; attempt < 100; attempt++) { if (condition()) return; await new Promise(r => setTimeout(r, 20)); }
+    throw new Error(message);
+}
 function assertCart(expected, total) {
     const actual = cart();
     assert(actual.length === expected.length, 'Cart line count differs: ' + JSON.stringify(actual));
@@ -252,6 +267,30 @@ try {
     $null = Send-Cdp 'Page.navigate' @{url = ([uri]$htmlPath).AbsoluteUri}
     $generation = Wait-PosReady
     $phaseOne = @'
+assertCart([], 0);
+const shortCard = $('.btn-add-product[data-id="6"]').closest('.product-card');
+assert($('.btn-add-product[data-id="6"]').prop('disabled') && shortCard.find('.badge').text() === 'Unavailable',
+    'Stock-short POS products must remain visible with disabled Add controls.');
+assert(shortCard.text().includes('<b>Not enough beans</b>') && !shortCard.find('b').length, 'POS availability reasons must render as literal text.');
+$('.btn-add-product[data-id="6"]').prop('disabled', false).trigger('click');
+assertCart([], 0);
+h.products.find(product => product.product_id === 6).can_order = true;
+h.products.find(product => product.product_id === 6).stock_available = true;
+$(window).trigger('focus');
+await waitFor(() => !$('.btn-add-product[data-id="6"]').prop('disabled'), 'POS focus refresh did not restore a restocked product.');
+click('.btn-add-product[data-id="6"]');
+assertCart([[6, 1, 5]], 5);
+h.products.find(product => product.product_id === 6).can_order = false;
+h.products.find(product => product.product_id === 6).stock_available = false;
+$(window).trigger('focus');
+await waitFor(() => cart()[0].unavailable && $('.btn-add-product[data-id="6"]').prop('disabled'), 'POS refresh did not flag a newly stock-short cart item.');
+$('.btn-increase[data-id="6"]').prop('disabled', false).trigger('click');
+assertCart([[6, 1, 5]], 5);
+$('#amount_paid').val('5.00');
+click('#btnCheckout');
+assertOffline();
+click('.btn-remove[data-id="6"]');
+$('#amount_paid').val('');
 assertCart([], 0);
 const paidInput = document.querySelector('#amount_paid');
 assert(paidInput && paidInput.type === 'number' && paidInput.required, 'A required numeric amount-paid input is missing.');
@@ -422,6 +461,46 @@ assertOffline(1);
 return 'One offline checkout sends the visible cart/payment/total/key, clears the cart, and automatically displays a complete sales receipt.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $receiptPhase + '})()'))
+    $null = Send-Cdp 'Page.navigate' @{url = ([uri]$kioskHtmlPath).AbsoluteUri}
+    $kioskReady = $false
+    for ($attempt = 0; $attempt -lt 100; $attempt++) {
+        try {
+            $state = Evaluate-Js '(() => { const h = window.__posHarness; return h ? {ready: document.readyState === "complete" && $("#kiosk-products .kiosk-add").length === h.products.length, errors: h.errors} : null; })()'
+            if ($state -and $state.errors.Count) { throw ('Kiosk browser errors: ' + ($state.errors -join '; ')) }
+            if ($state -and $state.ready) { $kioskReady = $true; break }
+        } catch { if ($_.Exception.Message -like 'Kiosk browser errors:*' -or $attempt -eq 99) { throw } }
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $kioskReady) { throw 'The offline kiosk menu did not load.' }
+    Write-Output (Evaluate-Js @'
+(async () => {
+    const h = __posHarness;
+    function assert(condition, message) { if (!condition) throw new Error(message); }
+    async function waitFor(condition, message) {
+        for (let attempt = 0; attempt < 100; attempt++) { if (condition()) return; await new Promise(r => setTimeout(r, 20)); }
+        throw new Error(message);
+    }
+    const card = $('.kiosk-add[data-id="6"]').closest('.card');
+    assert($('.kiosk-add[data-id="6"]').prop('disabled') && card.find('.badge').text() === 'Unavailable', 'Stock-short kiosk products must remain visible and disabled.');
+    assert(card.text().includes('<b>Not enough beans</b>') && !card.find('b').length, 'Kiosk availability reasons must render literally.');
+    $('.kiosk-add[data-id="6"]').prop('disabled', false).trigger('click');
+    assert(!$('#kiosk-cart .kiosk-remove').length, 'Forced clicks must not add an unavailable kiosk product.');
+    const product = h.products.find(product => product.product_id === 6);
+    product.can_order = true; product.stock_available = true;
+    $(window).trigger('focus');
+    await waitFor(() => !$('.kiosk-add[data-id="6"]').prop('disabled'), 'Restocking did not re-enable the kiosk product after focus refresh.');
+    $('.kiosk-add[data-id="6"]').trigger('click');
+    assert($('#kiosk-cart .kiosk-remove').length === 1, 'A restocked kiosk product could not be added.');
+    product.can_order = false; product.stock_available = false;
+    $(window).trigger('focus');
+    await waitFor(() => $('.kiosk-plus[data-id="6"]').prop('disabled') && $('#kiosk-submit').prop('disabled'), 'Kiosk refresh did not block the stock-short existing cart.');
+    $('.kiosk-plus[data-id="6"]').prop('disabled', false).trigger('click');
+    assert($('.kiosk-plus[data-id="6"]').siblings('span').text() === '1', 'A forced increase changed an unavailable kiosk quantity.');
+    $('#kiosk-submit').prop('disabled', false).trigger('click');
+    assert(!h.errors.length && h.requests.every(request => request.path === '/api/Kiosk/products' && request.method === 'GET'), 'Unavailable kiosk carts must not submit or issue external requests.');
+    return 'POS/kiosk availability passed: shortage badges, safe reasons, disabled and guarded Add/quantity/checkout, and restock refresh on window focus.';
+})()
+'@)
     Write-Output 'POS browser regression passed using the real PHP view, jQuery, Bootstrap, and POS.js.'
 } finally {
     if ($socket.State -eq [Net.WebSockets.WebSocketState]::Open) {

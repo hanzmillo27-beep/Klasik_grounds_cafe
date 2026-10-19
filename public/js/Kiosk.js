@@ -5,6 +5,8 @@ $(document).ready(function () {
     let products = [];
     let cart = [];
     let submitting = false;
+    let productRequestNumber = 0;
+    function canOrder(product) { return product && product.can_order !== false && product.stock_available !== false; }
 
     function money(value) {
         return '₱' + Number(value || 0).toFixed(2);
@@ -26,14 +28,22 @@ $(document).ready(function () {
     }
 
     function loadProducts() {
+        const requestNumber = ++productRequestNumber;
         $.ajax({
             url: `${base_url}/api/Kiosk/products`,
             type: 'GET',
             dataType: 'json'
         }).done(function (response) {
+            if (requestNumber !== productRequestNumber) return;
             products = response.data || [];
-            renderProducts(products);
+            cart.forEach(function (item) {
+                item.unavailable = !canOrder(products.find(product => Number(product.product_id) === Number(item.product_id)));
+            });
+            const search = String($('#kiosk-search').val() || '').toLowerCase().trim();
+            renderProducts(products.filter(product => String(product.product_name).toLowerCase().includes(search)));
+            renderCart();
         }).fail(function () {
+            if (requestNumber !== productRequestNumber) return;
             productContainer.html(`
                 <div class="col-12 text-danger text-center">
                     Unable to load the menu. Please try again.
@@ -67,9 +77,10 @@ $(document).ready(function () {
                             <div class="h5 text-primary">
                                 ${money(product.product_price)}
                             </div>
+                            ${!canOrder(product) ? `<span class="badge badge-warning mb-2">Unavailable</span><small class="d-block text-muted mb-2">${escapeHtml(product.availability_reason || '')}</small>` : ''}
                             <button type="button"
                                 class="btn btn-primary btn-lg btn-block kiosk-add"
-                                data-id="${product.product_id}">
+                                data-id="${product.product_id}" ${canOrder(product) ? '' : 'disabled'}>
                                 Add to Order
                             </button>
                         </div>
@@ -94,6 +105,7 @@ $(document).ready(function () {
                             ${escapeHtml(item.product_name)}
                         </div>
                         <div>${money(item.product_price)} each</div>
+                        ${item.unavailable ? '<span class="badge badge-warning">Unavailable</span>' : ''}
                         <div class="d-flex flex-wrap align-items-center mt-2">
                             <button type="button"
                                 class="btn btn-outline-secondary kiosk-minus"
@@ -101,7 +113,7 @@ $(document).ready(function () {
                             <span class="mx-3">${item.quantity}</span>
                             <button type="button"
                                 class="btn btn-outline-secondary kiosk-plus"
-                                data-id="${item.product_id}">+</button>
+                                data-id="${item.product_id}" ${item.unavailable ? 'disabled' : ''}>+</button>
                             <button type="button"
                                 class="btn btn-outline-danger ml-auto kiosk-remove"
                                 data-id="${item.product_id}">
@@ -121,7 +133,7 @@ $(document).ready(function () {
         }, 0);
 
         $('#kiosk-total').text(money(total));
-        $('#kiosk-submit').prop('disabled', !cart.length || submitting);
+        $('#kiosk-submit').prop('disabled', !cart.length || submitting || cart.some(item => item.unavailable));
     }
 
     function addProduct(id) {
@@ -129,7 +141,10 @@ $(document).ready(function () {
             return Number(item.product_id) === Number(id);
         });
 
-        if (!product) return;
+        if (submitting || !canOrder(product)) {
+            showMessage('warning', product && product.availability_reason || 'This product is unavailable.');
+            return;
+        }
 
         const existing = cart.find(function (item) {
             return Number(item.product_id) === Number(id);
@@ -155,6 +170,11 @@ $(document).ready(function () {
     });
 
     cartContainer.on('click', '.kiosk-plus', function () {
+        const product = products.find(product => Number(product.product_id) === Number($(this).data('id')));
+        if (submitting || !canOrder(product)) {
+            showMessage('warning', product && product.availability_reason || 'This product is unavailable.');
+            return;
+        }
         const item = cart.find(x =>
             Number(x.product_id) === Number($(this).data('id'))
         );
@@ -200,6 +220,10 @@ $(document).ready(function () {
 
     $('#kiosk-submit').on('click', function () {
         if (submitting || !cart.length) return;
+        if (cart.some(item => item.unavailable)) {
+            showMessage('warning', 'Remove unavailable products before submitting this order.');
+            return;
+        }
 
         submitting = true;
         renderCart();
@@ -224,6 +248,7 @@ $(document).ready(function () {
         }).done(function (response) {
             if (response.status !== 'success') {
                 showMessage('danger', response.message || 'Unable to submit order.');
+                loadProducts();
                 return;
             }
 
@@ -239,6 +264,7 @@ $(document).ready(function () {
             const message = xhr.responseJSON?.message ||
                 'Unable to submit your order. Please try again.';
             showMessage('danger', message);
+            loadProducts();
         }).always(function () {
             submitting = false;
             renderCart();
@@ -254,5 +280,6 @@ $(document).ready(function () {
     });
 
     loadProducts();
+    $(window).on('focus.kioskAvailability', function () { if (!submitting) loadProducts(); });
     renderCart();
 });

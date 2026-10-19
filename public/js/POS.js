@@ -30,6 +30,7 @@ $(document).ready(function () {
         let originalKioskItems = [];
         let loadingKiosk = false;
         let checkingOut = false;
+        let productRequestNumber = 0;
         let checkoutKey = localStorage.getItem('pos_checkout_key') || newCheckoutKey();
         localStorage.setItem('pos_checkout_key', checkoutKey);
 
@@ -74,6 +75,7 @@ $(document).ready(function () {
             $(s.refreshTransactionsBtn).on('click', loadTransactions);
 
             $('#btn-load-kiosk-order').on('click', handleLoadKioskOrder);
+            $(window).on('focus.posAvailability', function () { if (!checkingOut && !loadingKiosk) loadProducts(); });
         }
 
         function loadSavedCart() {
@@ -150,25 +152,28 @@ $(document).ready(function () {
         }
 
         function loadProducts() {
+            const requestNumber = ++productRequestNumber;
             $.ajax({
                 url: `${base_url}/api/POS/products`,
                 type: 'GET',
                 dataType: 'json'
             })
                 .done((res) => {
+                    if (requestNumber !== productRequestNumber) return;
                     products = res.data || [];
                     cart.forEach(function (item) {
                         const original = kioskOrderId !== null && originalKioskItems.find(x => Number(x.product_id) === Number(item.product_id));
                         const current = products.find(x => Number(x.product_id) === Number(item.product_id));
-                        item.unavailable = !current;
+                        item.unavailable = !current || !canOrder(current);
                         if (original) { item.product_name = original.product_name; item.product_price = Number(original.unit_price); }
                         else if (current) { item.product_name = current.product_name; item.product_price = Number(current.product_price); }
                     });
                     saveCart();
                     renderCart();
-                    renderProducts(products);
+                    handleProductSearch();
                 })
                 .fail((xhr) => {
+                    if (requestNumber !== productRequestNumber) return;
                     handleAjaxError(xhr);
 
                     $(s.productList).html(`
@@ -178,6 +183,8 @@ $(document).ready(function () {
                     `);
                 });
         }
+
+        function canOrder(product) { return product && product.can_order !== false && product.stock_available !== false; }
 
         function renderProducts(items) {
             if (!items.length) {
@@ -209,11 +216,13 @@ $(document).ready(function () {
                                 <div class="font-weight-bold mb-3">
                                     ${formatMoney(product.product_price)}
                                 </div>
+                                ${!canOrder(product) ? `<span class="badge badge-warning mb-2">Unavailable</span><small class="d-block text-muted mb-2">${escapeHtml(product.availability_reason || '')}</small>` : ''}
 
                                 <button
                                     type="button"
                                     class="btn btn-primary btn-sm w-100 btn-add-product"
                                     data-id="${product.product_id}"
+                                    ${canOrder(product) ? '' : 'disabled'}
                                 >
                                     <i class="fa fa-cart-plus mr-1"></i>
                                     Add
@@ -251,7 +260,8 @@ $(document).ready(function () {
                     Number(item.product_id) === Number(id)
             );
 
-            if (!product) {
+            if (!product || !canOrder(product)) {
+                msgBox('error', escapeHtml(product && product.availability_reason || 'This product is unavailable.'));
                 return;
             }
 
@@ -310,6 +320,7 @@ $(document).ready(function () {
                                 <div class="small text-muted">
                                     ${formatMoney(item.product_price)} each
                                 </div>
+                                ${item.unavailable ? '<span class="badge badge-warning">Unavailable</span>' : ''}
                             </div>
 
                             <div class="text-right ml-3">
@@ -342,6 +353,7 @@ $(document).ready(function () {
                                         type="button"
                                         class="btn btn-outline-secondary btn-increase"
                                         data-id="${item.product_id}"
+                                        ${item.unavailable ? 'disabled' : ''}
                                     >
                                         +
                                     </button>
@@ -428,6 +440,11 @@ $(document).ready(function () {
                 return;
             }
 
+            if (amount > 0 && (item.unavailable || !canOrder(products.find(product => Number(product.product_id) === Number(id))))) {
+                msgBox('error', 'This product is unavailable.');
+                return;
+            }
+
             if (item.quantity + amount > 99) { msgBox('error', 'Maximum quantity is 99 per product.'); return; }
             item.quantity += amount;
 
@@ -511,6 +528,7 @@ $(document).ready(function () {
                         product_id: Number(item.product_id),
                         product_name: item.product_name,
                         product_price: Number(item.unit_price),
+                        unavailable: !canOrder(products.find(product => Number(product.product_id) === Number(item.product_id))),
                         quantity: Number(item.quantity)
                     };
                 });
@@ -599,7 +617,7 @@ $(document).ready(function () {
                     const status = res.status || res.result;
 
                     msgBox(status, res.message);
-                    if (res.code === 'review_prices') loadProducts();
+                    if (res.code === 'review_prices' || status !== 'success') loadProducts();
 
                     if (status === 'success') {
                         resetCheckoutKey();
@@ -624,6 +642,7 @@ $(document).ready(function () {
                 })
                 .fail((xhr) => {
                     handleAjaxError(xhr);
+                    loadProducts();
                 })
                 .always(() => {
                     checkingOut = false;

@@ -16,6 +16,8 @@ class Kiosk extends Model
                 p.product_name,
                 p.product_price,
                 p.product_image,
+                p.is_active, p.is_available,
+                ' . ProductAvailability::stockSql() . ' AS stock_available,
                 c.category_name
              FROM products p
              LEFT JOIN categories c
@@ -26,6 +28,7 @@ class Kiosk extends Model
 
         $products = $stmt->fetchAll();
         foreach ($products as $product) {
+            ProductAvailability::apply($product);
             $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
         }
         return $products;
@@ -65,9 +68,10 @@ class Kiosk extends Model
                 $seen[$productId] = true;
 
                 $stmt = $this->db->prepare(
-                    'SELECT product_id, product_name, product_price
-                     FROM products
-                     WHERE product_id = ? AND is_active = TRUE AND is_available = TRUE'
+                    'SELECT p.product_id, p.product_name, p.product_price, p.is_active, p.is_available,
+                        ' . ProductAvailability::stockSql() . ' AS stock_available
+                     FROM products p
+                     WHERE p.product_id = ? AND p.is_active = TRUE AND p.is_available = TRUE'
                 );
                 $stmt->execute([$productId]);
 
@@ -76,6 +80,8 @@ class Kiosk extends Model
                 if (!$product) {
                     throw new \Exception('A product in your cart is no longer available.');
                 }
+                ProductAvailability::apply($product);
+                if (!$product->can_order) throw new \Exception('A product in your cart is unavailable due to insufficient ingredients.');
 
                 $price = Money::cents($product->product_price) / 100;
                 $subtotalCents = Money::cents($price) * $quantity;
@@ -93,6 +99,7 @@ class Kiosk extends Model
                 if ($totalCents > 9999999999) throw new \Exception('Order total exceeds the supported amount.');
             }
             $total = $totalCents / 100;
+            ProductAvailability::assertStock($this->db, $orderItems);
 
             $reference = 'KG-' . strtoupper(bin2hex(random_bytes(4)));
 

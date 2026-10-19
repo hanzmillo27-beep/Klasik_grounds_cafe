@@ -18,7 +18,9 @@ class POS extends Model
                 p.category_id,
                 c.category_name,
                 p.product_price,
-                p.product_image
+                p.product_image,
+                p.is_active, p.is_available,
+                ' . ProductAvailability::stockSql() . ' AS stock_available
              FROM products p
              LEFT JOIN categories c
                 ON c.category_id = p.category_id
@@ -28,6 +30,7 @@ class POS extends Model
 
         $products = $stmt->fetchAll();
         foreach ($products as $product) {
+            ProductAvailability::apply($product);
             $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
         }
         return $products;
@@ -40,6 +43,8 @@ class POS extends Model
                 p.product_id,
                 p.product_name,
                 p.product_price,
+                p.is_active, p.is_available,
+                ' . ProductAvailability::stockSql() . ' AS stock_available,
                 c.category_name
              FROM products p
              LEFT JOIN categories c
@@ -54,6 +59,8 @@ class POS extends Model
         if (!$product) {
             return null;
         }
+        ProductAvailability::apply($product);
+        if (!$product->can_order) return null;
 
         $stmt = $this->db->prepare(
             'SELECT

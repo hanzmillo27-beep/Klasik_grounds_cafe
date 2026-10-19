@@ -118,7 +118,14 @@ $(document).ready(function () {
                 },
 
                 { data: 'is_active', render: function (active) { return active ? 'Active' : 'Inactive'; } },
-                { data: 'is_available', render: function (available) { return available ? 'Available' : 'Unavailable'; } },
+                { data: 'can_order', defaultContent: '', render: function (available, type, product) {
+                    if (available == null) available = !!product.is_active && !!product.is_available;
+                    const label = available ? 'Available' : 'Unavailable';
+                    const reason = !available ? product.availability_reason || '' : '';
+                    if (type !== 'display') return label + (reason ? ': ' + reason : '');
+                    return `<span class="badge ${available ? 'badge-success' : 'badge-warning'}">${label}</span>`
+                        + (reason ? `<small class="d-block text-muted">${escapeHtml(reason)}</small>` : '');
+                } },
                 {
                     data: null,
 
@@ -132,6 +139,7 @@ $(document).ready(function () {
                         if (!$('body').data('manage-products')) return '';
                         return `
                             <button type="button" class="btn btn-sm btn-outline-secondary btn-availability"
+                                title="Change the availability setting. Ingredient stock is checked automatically."
                                 data-id="${data.product_id}" data-available="${data.is_available ? 0 : 1}">
                                 ${data.is_available ? 'Mark unavailable' : 'Mark available'}
                             </button>
@@ -698,5 +706,6 @@ $(document).ready(function () {
     loadInventory();
 
     loadProducts();
+    $(window).on('focus.productsAvailability', function () { if (table) table.ajax.reload(null, false); });
 
 });

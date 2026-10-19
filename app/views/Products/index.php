@@ -24,6 +24,7 @@
     </div>
 
     <div class="card-body">
+        <p class="small text-muted">Products become unavailable when ingredients are insufficient. You can also mark a product unavailable to pause orders.</p>
 
         <div class="table-responsive">
             <table
