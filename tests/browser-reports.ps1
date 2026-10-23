@@ -1,6 +1,6 @@
 param([string]$BrowserPath = '', [string]$PhpPath = '', [int]$DebugPort = 0)
 
-# Real report view, DataTables/Buttons, and Reports.js; every request is an offline GET fixture.
+# Real report view, DataTables, and Reports.js; every request is an offline GET fixture.
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $BrowserPath) {
@@ -207,6 +207,9 @@ try {
 (async () => {
     const h = __reportsHarness, table = $('#sales-report-table').DataTable();
     function assert(condition, message) { if (!condition) throw new Error(message); }
+    function assertNoOutputControls() {
+        assert(!$('.dt-buttons, .buttons-csv, .buttons-print').length, 'Reports must not display CSV or print controls.');
+    }
     async function waitFor(condition, message) {
         for (let attempt = 0; attempt < 100; attempt++) { if (condition()) return; await new Promise(r => setTimeout(r, 20)); }
         throw new Error(message);
@@ -220,28 +223,21 @@ try {
         && $('#report-count').text() === '2 transactions', 'Daily report summary differs from its rows.');
     assert($('#sales-report-table tbody').text().includes(h.hostile)
         && !$('#sales-report-table img').length && !window.__reportInjected, 'Report text must render literally without injected markup.');
-    const configs = table.settings()[0]._buttons[0].inst.s.buttons.map(button => button.conf);
-    const csv = configs.find(config => config.className.includes('buttons-csv'));
-    const print = configs.find(config => config.className.includes('buttons-print'));
-    assert(csv && print && csv.footer && print.footer, 'CSV and print buttons must include the report total.');
-    const csvData = table.buttons.exportData(csv.exportOptions);
-    assert(csvData.body.length === 2 && csvData.body[0][2] === "'=SUM(1,1)"
-        && csvData.body[1][2] === "'+Formula" && csvData.body[1][3] === "'@Cashier", 'CSV must contain the loaded rows and neutralize spreadsheet formulas.');
-    assert(csvData.body[0][3] === h.hostile && csvData.footer[0] === 'Daily sales: 2026-10-19 total'
-        && csvData.footer[4] === '125.80', 'CSV must preserve literal text and identify the selected period total.');
-    const printData = table.buttons.exportData(print.exportOptions);
-    assert(printData.body.length === 2 && printData.body[0][3].includes('&lt;img')
-        && !printData.body[0][3].includes('<img') && print.title() === 'Daily sales: 2026-10-19', 'Print configuration must escape report text and identify the loaded date.');
+    assert($('#sales-report-table tbody').text().includes('=SUM(1,1)')
+        && $('#sales-report-table tbody').text().includes('+Formula')
+        && $('#sales-report-table tbody').text().includes('@Cashier')
+        && $('#report-footer-total').text() === peso + '125.80', 'Daily rows must preserve literal text and show the loaded total.');
+    assertNoOutputControls();
     $('#report-date').val('2026-10-20');
-    assert(csv.filename() === 'daily-sales-2026-10-19', 'Editing the date must not relabel an already-loaded export.');
+    assert($('#report-label').text() === 'Daily sales: 2026-10-19', 'Editing the date must not relabel an already-loaded report.');
     $('#sales-report-form').trigger('submit');
     assert($('#sales-report-results').prop('hidden') && table.rows().count() === 0, 'Generating a report must hide and clear stale results.');
     await waitFor(() => table.rows().count() === 1 && !$('#generate-sales-report').prop('disabled'), 'Selected-day report did not load.');
     assert(h.requests[1].date === '2026-10-20' && $('#report-label').text() === 'Daily sales: 2026-10-20'
         && $('#report-total').text() === peso + '10.25', 'The selected report date or total differs.');
-    const selected = table.buttons.exportData(csv.exportOptions);
-    assert(selected.body.length === 1 && selected.body[0][0] === '3' && selected.footer[4] === '10.25'
-        && csv.filename() === 'daily-sales-2026-10-20', 'Exports must use only the newly loaded period.');
+    const selected = table.rows().data().toArray();
+    assert(selected.length === 1 && selected[0].sale_id === 3 && $('#report-footer-total').text() === peso + '10.25',
+        'Rows and footer must use only the newly loaded period.');
     $('#report-date').val('2026-10-21');
     $('#sales-report-form').trigger('submit');
     await waitFor(() => !$('#report-error').prop('hidden') && !$('#generate-sales-report').prop('disabled'), 'Report errors were not displayed.');
@@ -249,7 +245,7 @@ try {
         'Report error text must be escaped.');
     assert($('#sales-report-results').prop('hidden') && table.rows().count() === 0 && $('#report-total').text() === '',
         'A failed report must not retain stale rows or totals.');
-    assert(table.buttons().nodes().toArray().every(node => $(node).hasClass('disabled') || node.disabled), 'Report exports must be disabled after an error.');
+    assertNoOutputControls();
     $('#report-period').val('weekly').trigger('change');
     assert($('#report-date').prop('disabled') && !$('#report-date').prop('required')
         && !$('#report-week').prop('disabled') && $('#report-week').prop('required')
@@ -260,12 +256,10 @@ try {
     assert(h.requests[3].period === 'weekly' && h.requests[3].date === '2026-W43'
         && $('#report-label').text() === 'Weekly sales: 2026-10-19 to 2026-10-25'
         && $('#report-total').text() === peso + '30.30', 'The weekly query, Monday/Sunday boundaries, or total differs.');
-    const weekly = table.buttons.exportData(csv.exportOptions);
-    assert(weekly.body.length === 2 && weekly.body[0][1] === '2026-10-19 00:00:00'
-        && weekly.body[1][1] === '2026-10-25 23:59:59' && weekly.footer[4] === '30.30'
-        && weekly.footer[0] === 'Weekly sales: 2026-10-19 to 2026-10-25 total'
-        && csv.filename() === 'weekly-sales-2026-10-19-to-2026-10-25'
-        && print.title() === 'Weekly sales: 2026-10-19 to 2026-10-25', 'Weekly exports must use the loaded week and its exact total.');
+    const weekly = table.rows().data().toArray();
+    assert(weekly.length === 2 && weekly[0].sale_date === '2026-10-19 00:00:00'
+        && weekly[1].sale_date === '2026-10-25 23:59:59' && $('#report-footer-total').text() === peso + '30.30',
+        'Weekly rows and footer must use the loaded week and its exact total.');
     $('#report-period').val('monthly').trigger('change');
     assert($('#report-month').attr('type') === 'month' && $('#report-month').val() === '2026-10'
         && !$('#report-month').prop('disabled') && $('#report-month').prop('required')
@@ -277,20 +271,18 @@ try {
         && !$('#generate-sales-report').prop('disabled'), 'Leap-month report did not load.');
     assert(h.requests[4].period === 'monthly' && h.requests[4].date === '2024-02'
         && $('#report-total').text() === peso + '40.40', 'Monthly query or total differs.');
-    const monthly = table.buttons.exportData(csv.exportOptions);
-    assert(monthly.body.length === 2 && monthly.body[0][1] === '2024-02-01 00:00:00'
-        && monthly.body[1][1] === '2024-02-29 23:59:59' && monthly.footer[4] === '40.40'
-        && monthly.footer[0] === 'Monthly sales: 2024-02-01 to 2024-02-29 total'
-        && csv.filename() === 'monthly-sales-2024-02-01-to-2024-02-29'
-        && print.title() === 'Monthly sales: 2024-02-01 to 2024-02-29', 'Monthly exports must include the leap-day boundary and loaded total.');
+    const monthly = table.rows().data().toArray();
+    assert(monthly.length === 2 && monthly[0].sale_date === '2024-02-01 00:00:00'
+        && monthly[1].sale_date === '2024-02-29 23:59:59' && $('#report-footer-total').text() === peso + '40.40',
+        'Monthly rows and footer must include the leap-day boundary and loaded total.');
     $('#report-period').val('weekly').trigger('change');
     assert($('#report-month').val() === '2024-02' && $('#report-month').prop('disabled')
         && !$('#report-month').prop('required') && $('#report-week').val() === '2026-W43', 'Switching from monthly must preserve both month and week selections.');
     $('#sales-report-form').trigger('submit');
     await waitFor(() => $('#report-label').text() === 'Weekly sales: 2026-10-19 to 2026-10-25'
         && !$('#generate-sales-report').prop('disabled'), 'Weekly report did not recover after monthly selection.');
-    assert($('#report-total').text() === peso + '30.30' && table.buttons.exportData(csv.exportOptions).footer[4] === '30.30',
-        'Returning to weekly must replace monthly totals and exports.');
+    assert($('#report-total').text() === peso + '30.30' && $('#report-footer-total').text() === peso + '30.30',
+        'Returning to weekly must replace monthly totals.');
     $('#report-period').val('daily').trigger('change');
     assert($('#report-date').val() === '2026-10-21' && $('#report-week').val() === '2026-W43'
         && !$('#report-date').prop('disabled') && $('#report-date').prop('required')
@@ -300,8 +292,8 @@ try {
     $('#report-date').val('2026-10-19');
     $('#sales-report-form').trigger('submit');
     await waitFor(() => $('#report-label').text() === 'Daily sales: 2026-10-19' && !$('#generate-sales-report').prop('disabled'), 'Returning to daily reports did not load the selected date.');
-    assert($('#report-total').text() === peso + '125.80' && csv.filename() === 'daily-sales-2026-10-19'
-        && table.buttons.exportData(csv.exportOptions).footer[4] === '125.80', 'Returning to daily reports retained a weekly export total.');
+    assert($('#report-total').text() === peso + '125.80' && $('#report-footer-total').text() === peso + '125.80',
+        'Returning to daily reports must replace the weekly total.');
     const productTable = $('#product-report-table').DataTable();
     $('#report-type').val('products').trigger('change');
     assert($('#sales-report-results').prop('hidden') && table.rows().count() === 0 && productTable.rows().count() === 0,
@@ -311,34 +303,25 @@ try {
     assert(h.requests[7].path === '/api/Reports/products' && h.requests[7].period === 'daily' && h.requests[7].date === '2026-10-19'
         && $('#sales-report-wrapper').prop('hidden') && !$('#product-report-wrapper').prop('hidden'), 'Product report must use the selected period and its own table.');
     assert($('#report-label').text() === 'Product sales: 2026-10-19' && $('#report-total').text() === peso + '130.00'
-        && $('#report-count').text() === '2 transactions' && $('#product-footer-quantity').text() === '6', 'Product summary totals differ.');
+        && $('#report-count').text() === '2 transactions' && $('#product-footer-quantity').text() === '6'
+        && $('#product-footer-total').text() === peso + '130.00', 'Product summary totals differ.');
     const productRows = productTable.rows().data().toArray();
     assert(productRows.find(row => row.product_id === 1).quantity_sold === 3
+        && productRows.find(row => row.product_id === 1).product_name === '=SUM(1,1)'
+        && productRows.find(row => row.product_id === 1).total_sales === '125.50'
         && productRows.find(row => row.product_id === null).product_name === 'Deleted Product', 'Product aggregates or historical deleted-product rows were not retained.');
     assert($('#product-report-table tbody').text().includes(h.hostile) && !$('#product-report-table img').length && !window.__reportInjected,
         'Product names must display literally.');
-    const productConfigs = productTable.settings()[0]._buttons[0].inst.s.buttons.map(button => button.conf);
-    const productCsv = productConfigs.find(config => config.className.includes('buttons-csv'));
-    const productPrint = productConfigs.find(config => config.className.includes('buttons-print'));
-    const productData = productTable.buttons.exportData(productCsv.exportOptions);
-    assert(productData.body.length === 3 && productData.body.some(row => row[0] === "'=SUM(1,1)" && row[1] === '3' && row[2] === '125.50')
-        && productData.body.some(row => row[0] === h.hostile) && productData.footer[1] === '6' && productData.footer[2] === '130.00'
-        && productData.footer[0] === 'Product sales: 2026-10-19 total' && productCsv.filename() === 'product-sales-daily-2026-10-19',
-        'Product CSV must contain aggregates, literal safe names, and matching quantity/sales totals.');
-    const productPrintData = productTable.buttons.exportData(productPrint.exportOptions);
-    assert(productPrintData.body.some(row => row[0].includes('&lt;img') && !row[0].includes('<img'))
-        && productPrintData.footer[1] === '6' && productPrintData.footer[2] === '130.00'
-        && productPrint.title() === 'Product sales: 2026-10-19', 'Product print configuration must escape names and retain totals.');
+    assertNoOutputControls();
     $('#report-period').val('weekly').trigger('change');
     assert(productTable.rows().count() === 0 && $('#sales-report-results').prop('hidden'), 'Changing product periods must clear stale results.');
     $('#sales-report-form').trigger('submit');
     await waitFor(() => $('#report-label').text() === 'Product sales: 2026-10-19 to 2026-10-25'
         && !$('#generate-sales-report').prop('disabled'), 'Weekly product report did not load.');
-    const weeklyProducts = productTable.buttons.exportData(productCsv.exportOptions);
     assert(h.requests[8].path === '/api/Reports/products' && h.requests[8].date === '2026-W43'
-        && weeklyProducts.footer[1] === '9' && weeklyProducts.footer[2] === '230.00'
+        && $('#product-footer-quantity').text() === '9' && $('#product-footer-total').text() === peso + '230.00'
         && $('#report-total').text() === peso + '230.00'
-        && productCsv.filename() === 'product-sales-weekly-2026-10-19-to-2026-10-25', 'Weekly product totals and exports must replace the daily report.');
+        && productTable.rows().count() === 3, 'Weekly product rows and totals must replace the daily report.');
     $('#sales-report-form').trigger('submit');
     $('#report-type').val('sales').trigger('change');
     await new Promise(resolve => setTimeout(resolve, 60));
@@ -368,21 +351,16 @@ try {
         && $('#inventory-report-table tbody').text().includes('<b>kg</b>')
         && !$('#inventory-report-table img, #inventory-report-table b').length && !window.__reportInjected,
         'Inventory names and units must render as literal text.');
-    const inventoryConfigs = inventoryTable.settings()[0]._buttons[0].inst.s.buttons.map(button => button.conf);
-    const inventoryCsv = inventoryConfigs.find(config => config.className.includes('buttons-csv'));
-    const inventoryPrint = inventoryConfigs.find(config => config.className.includes('buttons-print'));
-    const inventoryData = inventoryTable.buttons.exportData(inventoryCsv.exportOptions);
-    assert(inventoryData.body.length === 3
-        && inventoryData.body.some(row => row[0] === "'=Trace stock" && row[1] === '0.001' && row[2] === "'@kg" && row[3] === '0.010' && row[4] === 'Low stock')
-        && inventoryData.body.some(row => row[0] === 'Zero stock' && row[1] === '0.000' && row[3] === '0.000' && row[4] === 'Low stock'),
-        'Inventory CSV must preserve quantity/minimum precision, status, and formula-safe cells.');
-    assert(inventoryData.footer[0] === 'Inventory report: 2026-10-19 12:34:56'
-        && inventoryData.footer[1] === '' && inventoryData.footer[3] === 'Items: 3' && inventoryData.footer[4] === 'Low stock: 2'
-        && inventoryCsv.filename() === 'inventory-20261019123456', 'Inventory exports must identify snapshot time and counts without a mixed-unit stock total.');
-    const inventoryPrintData = inventoryTable.buttons.exportData(inventoryPrint.exportOptions);
-    assert(inventoryPrintData.body.some(row => row[0].includes('&lt;img') && row[2] === '&lt;b&gt;kg&lt;/b&gt;')
-        && inventoryPrint.title() === 'Inventory report: 2026-10-19 12:34:56'
-        && inventoryPrint.messageTop() === 'Items: 3; Low stock: 2', 'Inventory print output must safely show the complete snapshot and counts.');
+    const inventoryRows = inventoryTable.rows().data().toArray();
+    assert(inventoryRows.some(row => row.inv_name === '=Trace stock' && row.amount === '0.001'
+            && row.unit === '@kg' && row.min_stock === '0.010' && row.is_low)
+        && inventoryRows.some(row => row.inv_name === 'Zero stock' && row.amount === '0.000'
+            && row.min_stock === '0.000' && row.is_low)
+        && $('#inventory-report-table tbody').text().includes('Low stock')
+        && $('#inventory-report-table tbody').text().includes('In stock'), 'Inventory rows must preserve fractional and zero quantities, literal units, and stock status.');
+    assert($('#inventory-footer-count').text() === 'Items: 3' && $('#inventory-footer-low').text() === 'Low stock: 2',
+        'Inventory footers must show item and low-stock counts.');
+    assertNoOutputControls();
     $('#report-type').val('sales').trigger('change');
     assert(!$('#report-period').prop('disabled') && !$('#report-date').prop('disabled') && $('#report-date').prop('required'),
         'Returning to sales must restore the preserved active date picker.');
@@ -391,7 +369,8 @@ try {
     assert(inventoryTable.rows().count() === 0 && $('#inventory-report-wrapper').prop('hidden')
         && !$('#report-money-summary').prop('hidden') && $('#report-total').text() === peso + '125.80', 'Inventory snapshot data must not persist into a sales report.');
     assert(!h.errors.length && h.requests.length === 13 && h.requests.every(request => request.method === 'GET'), 'Unexpected browser error or external request.');
-    return 'Owner report checks passed: daily/weekly/monthly sales, product aggregates, inventory snapshots, safe CSV/print exports, picker preservation, and stale/pending clearing. No download or print dialog opened.';
+    assertNoOutputControls();
+    return 'Owner report checks passed: daily/weekly/monthly sales, product aggregates, inventory snapshots, safe display, picker preservation, stale/pending clearing, and no CSV/print controls.';
 })()
 '@
     Write-Output (Evaluate-Js $checks)
@@ -423,7 +402,8 @@ try {
         && $('#product-report-table').DataTable().rows().count() === 0
         && $('#sales-report-wrapper').prop('hidden') && $('#product-report-wrapper').prop('hidden')
         && $('#report-money-summary').prop('hidden') && $('#report-total').text() === '', 'Staff must receive only inventory data and counts.');
-    return 'Staff reports passed: Inventory is the only option; snapshot loads without period/date inputs or financial requests.';
+    assert(!$('.dt-buttons, .buttons-csv, .buttons-print').length, 'Staff reports must not display CSV or print controls.');
+    return 'Staff reports passed: Inventory is the only option; snapshot loads without period/date inputs, financial requests, or CSV/print controls.';
 })()
 '@)
 } finally {

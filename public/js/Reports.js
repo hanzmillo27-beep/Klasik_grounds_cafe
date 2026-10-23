@@ -1,5 +1,4 @@
 $(document).ready(function () {
-    let report = null;
     let request = null;
     let requestNumber = 0;
 
@@ -7,10 +6,6 @@ $(document).ready(function () {
     function escapeHtml(value) { return $('<div>').text(text(value)).html(); }
     function decimal(value) { return Number(value || 0).toFixed(2); }
     function money(value) { return '\u20b1' + decimal(value); }
-    function spreadsheetText(value) {
-        const result = text(value);
-        return /^[\s\u0000-\u001f]*[=+\-@]/.test(result) ? "'" + result : result;
-    }
     function renderText(value, type) {
         return type === 'display' ? escapeHtml(value) : text(value);
     }
@@ -22,47 +17,9 @@ $(document).ready(function () {
         return type === 'display' ? Number(value || 0).toLocaleString(undefined, {maximumFractionDigits: 3})
             : Number(value || 0).toFixed(3);
     }
-    function exportOptions(forPrint, products, inventory) {
-        function output(value) { return forPrint ? escapeHtml(value) : spreadsheetText(value); }
-        return {
-            columns: inventory ? [0, 1, 2, 3, 4] : products ? [0, 1, 2] : [0, 1, 2, 3, 4, 5, 6], orthogonal: 'export',
-            modifier: {search: 'none', order: 'applied', page: 'all', selected: null},
-            stripHtml: false, decodeEntities: false, stripNewlines: false, trim: false,
-            format: {
-                header: function (value, column, node) { return output($(node).text()); },
-                body: function (value) { return output(value); },
-                footer: function (value, column) {
-                    if (inventory) return output(!report ? '' : column === 0 ? report.label
-                        : column === 3 ? 'Items: ' + Number(report.total_items)
-                        : column === 4 ? 'Low stock: ' + Number(report.low_stock_count) : '');
-                    return output(!report ? '' : column === 0 ? report.label + ' total'
-                        : products && column === 1 ? text(report.total_quantity)
-                        : column === (products ? 2 : 4) ? decimal(report.total_amount) : '');
-                }
-            }
-        };
-    }
-    function reportButtons(products, inventory) {
-        return [
-            {extend: 'csvHtml5', text: 'Export CSV', footer: true, bom: true,
-                filename: function () {
-                    if (inventory) return report ? 'inventory-' + text(report.generated_at).replace(/[^0-9]/g, '') : 'inventory-report';
-                    return report ? (products ? 'product-sales-' + report.period : report.period + '-sales') + '-' + report.start_date
-                        + (report.period === 'daily' ? '' : '-to-' + report.end_date) : 'sales-report';
-                },
-                exportOptions: exportOptions(false, products, inventory)},
-            {extend: 'print', text: 'Print report', footer: true,
-                title: function () { return report ? escapeHtml(report.label) : 'Sales report'; },
-                messageTop: function () { return !report ? '' : inventory
-                    ? 'Items: ' + Number(report.total_items) + '; Low stock: ' + Number(report.low_stock_count)
-                    : 'Transactions: ' + Number(report.transaction_count); },
-                exportOptions: exportOptions(true, products, inventory)}
-        ];
-    }
-
     const table = $('#sales-report-table').DataTable({
         data: [], autoWidth: false, searching: false, pageLength: 25,
-        order: [[1, 'asc'], [0, 'asc']], dom: 'Brtip',
+        order: [[1, 'asc'], [0, 'asc']], dom: 'rtip',
         language: {emptyTable: 'No completed transactions for this period.'},
         columns: [
             {data: 'sale_id', render: renderText},
@@ -72,21 +29,19 @@ $(document).ready(function () {
             {data: 'total_amount', render: renderMoney},
             {data: 'amount_paid', defaultContent: '', render: renderMoney},
             {data: 'change_amount', defaultContent: '', render: renderMoney}
-        ],
-        buttons: reportButtons(false)
+        ]
     });
     const productTable = $('#product-report-table').DataTable({
-        data: [], autoWidth: false, searching: false, pageLength: 25, order: [[0, 'asc']], dom: 'Brtip',
+        data: [], autoWidth: false, searching: false, pageLength: 25, order: [[0, 'asc']], dom: 'rtip',
         language: {emptyTable: 'No product sales for this period.'},
         columns: [
             {data: 'product_name', render: renderText},
             {data: 'quantity_sold', render: renderText},
             {data: 'total_sales', render: renderMoney}
-        ],
-        buttons: reportButtons(true)
+        ]
     });
     const inventoryTable = $('#inventory-report-table').DataTable({
-        data: [], autoWidth: false, searching: false, pageLength: 25, order: [[0, 'asc']], dom: 'Brtip',
+        data: [], autoWidth: false, searching: false, pageLength: 25, order: [[0, 'asc']], dom: 'rtip',
         language: {emptyTable: 'No inventory items found.'},
         columns: [
             {data: 'inv_name', render: renderText},
@@ -94,21 +49,13 @@ $(document).ready(function () {
             {data: 'unit', render: renderText},
             {data: 'min_stock', render: renderQuantity},
             {data: 'is_low', render: function (low, type) { return renderText(low ? 'Low stock' : 'In stock', type); }}
-        ],
-        buttons: reportButtons(false, true)
+        ]
     });
-    table.buttons().disable();
-    productTable.buttons().disable();
-    inventoryTable.buttons().disable();
 
     function clearReport() {
-        report = null;
         table.clear().draw();
-        table.buttons().disable();
         productTable.clear().draw();
-        productTable.buttons().disable();
         inventoryTable.clear().draw();
-        inventoryTable.buttons().disable();
         $('#sales-report-results').prop('hidden', true);
         $('#report-label, #report-count, #report-total, #report-footer-total, #product-footer-quantity, #product-footer-total, #inventory-low-count, #inventory-footer-count, #inventory-footer-low').text('');
     }
@@ -142,7 +89,7 @@ $(document).ready(function () {
                     showError(response.message || 'Unable to load the sales report.');
                     return;
                 }
-                report = response.data;
+                const report = response.data;
                 const activeTable = inventory ? inventoryTable : products ? productTable : table;
                 activeTable.rows.add(report.rows).draw();
                 $('#report-label').text(report.label);
@@ -160,7 +107,6 @@ $(document).ready(function () {
                 $('#inventory-footer-low').text(inventory ? 'Low stock: ' + Number(report.low_stock_count) : '');
                 $('#sales-report-results').prop('hidden', false);
                 $('#report-message').text(report.rows.length ? '' : inventory ? 'No inventory items found.' : 'No completed transactions for this period.');
-                activeTable.buttons().enable();
                 activeTable.columns.adjust();
             })
             .fail(function (xhr, status) {
