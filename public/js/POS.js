@@ -237,7 +237,7 @@ $(document).ready(function () {
         function handleProductSearch() {
             const search = $(s.productSearch)
                 .val()
-                .toLowerCase()
+                .toUpperCase()
                 .trim();
 
             const filtered = products.filter((product) =>
