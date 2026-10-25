@@ -14,6 +14,9 @@ $(document).ready(function () {
             transactionsTable: '#transactions-table',
             refreshTransactionsBtn: '#btn-refresh-transactions',
 
+            kioskQueue: '#kiosk-order-queue',
+            refreshKioskQueueBtn: '#btn-refresh-kiosk-queue',
+
             transactionModal: '#transactionDetailsModal',
             transactionDetails: '#transaction-details'
         };
@@ -31,6 +34,10 @@ $(document).ready(function () {
         let loadingKiosk = false;
         let checkingOut = false;
         let productRequestNumber = 0;
+        let kioskOrders = [];
+        let kioskQueueState = 'loading';
+        let kioskQueueRequest = null;
+        let kioskQueueRequestNumber = 0;
         let checkoutKey = localStorage.getItem('pos_checkout_key') || newCheckoutKey();
         localStorage.setItem('pos_checkout_key', checkoutKey);
 
@@ -49,7 +56,11 @@ $(document).ready(function () {
             bindEvents();
             loadProducts();
             loadTransactions();
+            loadKioskQueue();
             renderCart();
+            window.setInterval(function () {
+                if (!document.hidden) loadKioskQueue();
+            }, 15000);
         }
 
         function bindEvents() {
@@ -75,7 +86,84 @@ $(document).ready(function () {
             $(s.refreshTransactionsBtn).on('click', loadTransactions);
 
             $('#btn-load-kiosk-order').on('click', handleLoadKioskOrder);
-            $(window).on('focus.posAvailability', function () { if (!checkingOut && !loadingKiosk) loadProducts(); });
+            $(s.refreshKioskQueueBtn).on('click', loadKioskQueue);
+            $(s.kioskQueue).on('click', '.btn-load-queued-order', function (event) {
+                event.preventDefault();
+                const id = Number($(this).data('order-id'));
+                const order = kioskOrders.find(item => Number(item.kiosk_order_id) === id);
+                if (order) loadKioskOrder(order.reference_code);
+            });
+            $(window).on('focus.posAvailability', function () {
+                if (!checkingOut && !loadingKiosk) {
+                    loadProducts();
+                    loadKioskQueue();
+                }
+            });
+        }
+
+        function loadKioskQueue() {
+            if (checkingOut || loadingKiosk || !$(s.kioskQueue).length) return;
+            const number = ++kioskQueueRequestNumber;
+            if (kioskQueueRequest && kioskQueueRequest.abort) kioskQueueRequest.abort();
+            $(s.refreshKioskQueueBtn).prop('disabled', true);
+            $('#kiosk-queue-message').removeClass('text-danger').addClass('text-muted').text('Refreshing kiosk orders...');
+            kioskQueueRequest = $.ajax({
+                url: `${base_url}/api/POS/kioskOrders`,
+                type: 'GET',
+                dataType: 'json'
+            }).done(function (response) {
+                if (number !== kioskQueueRequestNumber) return;
+                if (!response || response.status !== 'success' || !Array.isArray(response.data)) {
+                    showKioskQueueError(response && response.message || 'Unable to load kiosk orders.');
+                    return;
+                }
+                kioskOrders = response.data;
+                kioskQueueState = 'ready';
+                $('#kiosk-queue-message').text('Updates automatically every 15 seconds.');
+                renderKioskQueue();
+            }).fail(function (xhr, status) {
+                if (number !== kioskQueueRequestNumber || status === 'abort') return;
+                showKioskQueueError(xhr.responseJSON && xhr.responseJSON.message || 'Unable to load kiosk orders. Use Refresh to try again.');
+            }).always(function () {
+                if (number !== kioskQueueRequestNumber) return;
+                kioskQueueRequest = null;
+                $(s.refreshKioskQueueBtn).prop('disabled', loadingKiosk || checkingOut);
+            });
+        }
+
+        function showKioskQueueError(message) {
+            kioskOrders = [];
+            kioskQueueState = 'error';
+            $('#kiosk-queue-message').removeClass('text-muted').addClass('text-danger').text(message);
+            renderKioskQueue();
+        }
+
+        function renderKioskQueue() {
+            $('#kiosk-queue-count').text(kioskQueueState === 'ready' ? kioskOrders.length : '\u2014');
+            if (!kioskOrders.length) {
+                const message = kioskQueueState === 'loading' ? 'Loading kiosk orders...'
+                    : kioskQueueState === 'error' ? 'Kiosk orders are unavailable. Please refresh.' : 'No kiosk orders are waiting.';
+                $(s.kioskQueue).html('<tr><td colspan="7" class="text-center text-muted py-3">' + escapeHtml(message) + '</td></tr>');
+            } else {
+                $(s.kioskQueue).html(kioskOrders.map(function (order) {
+                    const current = cart.length > 0 && Number(order.kiosk_order_id) === kioskOrderId;
+                    const claimed = order.status === 'claimed';
+                    return `<tr>
+                        <td class="font-weight-bold">${escapeHtml(order.reference_code)}</td>
+                        <td>${escapeHtml(order.customer_name || 'Walk-in Customer')}</td>
+                        <td>${Number(order.item_count || 0)}</td>
+                        <td>${formatMoney(order.total_amount)}</td>
+                        <td>${escapeHtml(formatDate(order.created_at))}</td>
+                        <td><span class="badge ${claimed ? 'badge-info' : 'badge-warning'}">${current ? 'In current sale' : claimed ? 'Retrieved by you' : 'Waiting'}</span></td>
+                        <td class="text-right"><button type="button" class="btn btn-primary btn-sm btn-load-queued-order"
+                            data-order-id="${Number(order.kiosk_order_id)}" ${loadingKiosk || checkingOut || cart.length > 0 ? 'disabled' : ''}>
+                            ${current ? 'In current sale' : claimed ? 'Resume order' : 'Load order'}
+                        </button></td>
+                    </tr>`;
+                }).join(''));
+            }
+            $('#btn-load-kiosk-order').prop('disabled', loadingKiosk || checkingOut);
+            $(s.refreshKioskQueueBtn).prop('disabled', loadingKiosk || checkingOut || kioskQueueRequest !== null);
         }
 
         function loadSavedCart() {
@@ -296,6 +384,7 @@ $(document).ready(function () {
         }
 
         function renderCart() {
+            renderKioskQueue();
             if (!cart.length) {
                 $(s.cartList).html(`
                     <div class="text-center text-muted py-4">
@@ -482,11 +571,13 @@ $(document).ready(function () {
 
         function handleLoadKioskOrder(e) {
             e.preventDefault();
+            loadKioskOrder($('#kiosk-reference-input').val());
+        }
+
+        function loadKioskOrder(value) {
             if (loadingKiosk || checkingOut) return;
 
-            const reference = String(
-                $('#kiosk-reference-input').val() || ''
-            ).trim().toUpperCase();
+            const reference = String(value || '').trim().toUpperCase();
 
             if (!reference) {
                 msgBox('error', 'Enter a kiosk order reference.');
@@ -499,7 +590,7 @@ $(document).ready(function () {
             }
 
             loadingKiosk = true;
-            $('#btn-load-kiosk-order').prop('disabled', true);
+            renderKioskQueue();
             $.ajax({
                 url: `${base_url}/api/Kiosk/claim/${encodeURIComponent(reference)}`,
                 type: 'POST',
@@ -548,7 +639,8 @@ $(document).ready(function () {
                 handleAjaxError(xhr);
             }).always(function () {
                 loadingKiosk = false;
-                $('#btn-load-kiosk-order').prop('disabled', false);
+                renderKioskQueue();
+                loadKioskQueue();
             });
         }
 
@@ -602,6 +694,7 @@ $(document).ready(function () {
 }
 
             checkingOut = true;
+            renderKioskQueue();
             $('#amount_paid').prop('disabled', true);
             $(s.checkoutBtn).prop('disabled', true);
 
@@ -648,6 +741,8 @@ $(document).ready(function () {
                     checkingOut = false;
                     $('#amount_paid').prop('disabled', false);
                     $(s.checkoutBtn).prop('disabled', false);
+                    renderKioskQueue();
+                    loadKioskQueue();
                 });
         }
 

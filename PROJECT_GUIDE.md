@@ -264,6 +264,7 @@ API controllers accept `$_POST` or JSON-decoded request data, validate it, call 
 ### `app/api/POS/POSController.php`
 
 - Returns products and one product with ingredients.
+- `GET /api/POS/kioskOrders` returns unpaid kiosk order summaries for cashiers and owners: pending orders plus orders claimed by the current account, oldest first.
 - Lists transactions and transaction details.
 - Accepts checkout data and returns loyalty results when a point is earned.
 
@@ -331,6 +332,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Locks product rows while creating a kiosk order.
 - Inserts `kiosk_orders` and `kiosk_order_items` in one transaction.
 - Finds an order by reference with its items.
+- `queue()` lists pending orders and the current cashier's claimed orders, with summed item quantities. Completed orders and other cashiers' claims are excluded.
 - `claim()` locks a pending order and marks it claimed by a cashier.
 - `cashierCanAccess()` verifies the caller's role.
 
@@ -415,7 +417,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 
 ### `app/views/POS/index.php`
 
-- Defines the cashier product search, cart, checkout form, kiosk-order loader, transaction table, and transaction detail modal.
+- Defines the kiosk order queue, cashier product search, cart, checkout form, kiosk-order loader, transaction table, and transaction detail modal.
 
 ### `app/views/Kiosk/index.php`
 
@@ -485,6 +487,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Loads products and transactions.
 - Keeps the current cart, customer name, and kiosk order ID in localStorage.
 - Adds and changes cart quantities.
+- Refreshes the kiosk queue every 15 seconds while visible, on window focus, and through its Refresh button. Queue loads use the existing claim flow and require an empty cart.
 - Loads kiosk orders by reference.
 - Sends checkout data to `/api/POS/checkout`.
 - Renders transaction history and transaction details.

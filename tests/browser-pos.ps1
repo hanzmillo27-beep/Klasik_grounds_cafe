@@ -57,6 +57,14 @@ window.base_url = 'http://pos-fixture.invalid';
 window.__posHarness = {
     generation: String(Date.now()) + Math.random(),
     errors: [], requests: [], messages: [], allowCheckout: false,
+    queueFetches: 0, queueResponses: [], intervals: [],
+    queueOrders: [
+        {kiosk_order_id: 42, reference_code: 'KG-BROWSER', customer_name: 'Kiosk customer',
+            total_amount: 391, created_at: '2026-10-19 10:00:00', item_count: 3,
+            status: localStorage.getItem('pos_kiosk_order_id') === '42' ? 'claimed' : 'pending'},
+        {kiosk_order_id: 43, reference_code: 'KG-ESCAPED', customer_name: '<img src=x onerror="window.__queueXss=true">',
+            total_amount: 50, created_at: '2026-10-19 10:01:00', status: 'pending', item_count: 1}
+    ],
     products: [
         {product_id: 1, product_name: 'Current Americano', product_price: 999, category_name: 'Coffee'},
         {product_id: 2, product_name: 'Current Latte', product_price: 160, category_name: 'Coffee'},
@@ -93,20 +101,36 @@ window.msgBox = function (status, message) { __posHarness.messages.push({status:
 window.handleAjaxError = function () { __posHarness.errors.push('Unexpected AJAX failure.'); };
 // Confirm New order deterministically; the test exercises POS behavior, not SweetAlert.
 window.Swal = {fire: function () { return Promise.resolve({isConfirmed: true}); }};
+const nativeSetInterval = window.setInterval;
+window.setInterval = function (callback, milliseconds) {
+    __posHarness.intervals.push({callback: callback, milliseconds: milliseconds});
+    return nativeSetInterval.apply(window, arguments);
+};
 $.ajax = function (options) {
     var deferred = $.Deferred(), path = new URL(options.url).pathname;
     __posHarness.requests.push({path: path, method: options.type || 'GET'});
-    var response, delay = 0;
+    var response, delay = 0, rejection = null, ignoreAbort = false;
+    function requireFixture(condition, message) {
+        if (!condition) { __posHarness.errors.push(message); throw new Error(message); }
+    }
     if (path === '/api/POS/products' || path === '/api/Kiosk/products') response = {data: __posHarness.products};
     else if (path === '/api/POS/transactions') response = {data: []};
+    else if (path === '/api/POS/kioskOrders') {
+        requireFixture((options.type || 'GET') === 'GET', 'The kiosk queue must use GET.');
+        __posHarness.queueFetches++;
+        const fixture = __posHarness.queueResponses.shift() || {};
+        response = fixture.response || {status: 'success', data: __posHarness.queueOrders};
+        delay = fixture.delay || 0;
+        rejection = fixture.failure || null;
+        ignoreAbort = !!fixture.ignoreAbort;
+    }
     else if (path === '/api/Kiosk/claim/KG-BROWSER') {
+        requireFixture(options.type === 'POST', 'Loading a kiosk order must use the shared POST claim endpoint.');
+        __posHarness.queueOrders.find(order => order.kiosk_order_id === 42).status = 'claimed';
         response = {status: 'success', data: __posHarness.order};
         delay = 100;
     } else if (path === '/api/POS/checkout' && __posHarness.allowCheckout) {
         __posHarness.allowCheckout = false;
-        function requireFixture(condition, message) {
-            if (!condition) { __posHarness.errors.push(message); throw new Error(message); }
-        }
         requireFixture(options.type === 'POST' && options.data instanceof FormData, 'Checkout must POST FormData.');
         const data = options.data, expected = __posHarness.expectedCheckout;
         requireFixture(expected && data.get('amount_paid') === '100.00' && data.get('expected_total') === '50.30',
@@ -131,8 +155,19 @@ $.ajax = function (options) {
         __posHarness.errors.push('Disallowed request: ' + path);
         throw new Error('Only allowlisted offline POS fixtures may be requested: ' + path);
     }
-    setTimeout(function () { deferred.resolve(JSON.parse(JSON.stringify(response))); }, delay);
-    return deferred.promise();
+    // Snapshot responses at request time, including deliberately late queue results.
+    const snapshot = JSON.parse(JSON.stringify(response));
+    const timer = setTimeout(function () {
+        if (rejection) deferred.reject(rejection, 'error');
+        else deferred.resolve(snapshot);
+    }, delay);
+    const promise = deferred.promise();
+    promise.abort = function () {
+        if (ignoreAbort) return;
+        clearTimeout(timer);
+        deferred.reject({status: 0}, 'abort');
+    };
+    return promise;
 };
 '@
 $html = @"
@@ -194,7 +229,7 @@ function Evaluate-Js([string]$expression) {
 function Wait-PosReady([string]$previousGeneration = '') {
     for ($attempt = 0; $attempt -lt 100; $attempt++) {
         try {
-            $state = Evaluate-Js '(() => { const h = window.__posHarness; return h ? {generation: h.generation, ready: document.readyState === "complete" && document.querySelectorAll(".btn-add-product").length === h.products.length, errors: h.errors} : null; })()'
+            $state = Evaluate-Js '(() => { const h = window.__posHarness; return h ? {generation: h.generation, ready: document.readyState === "complete" && document.querySelectorAll(".btn-add-product").length === h.products.length && document.querySelectorAll("#kiosk-order-queue .btn-load-queued-order").length === h.queueOrders.length, errors: h.errors} : null; })()'
             if ($state -and $state.errors.Count) { throw ('POS browser errors: ' + ($state.errors -join '; ')) }
             if ($state -and $state.ready -and $state.generation -ne $previousGeneration) { return $state.generation }
         } catch {
@@ -215,6 +250,13 @@ function click(selector) {
     button.click();
 }
 function cart() { return JSON.parse(localStorage.getItem('pos_cart') || '[]'); }
+function queueButton(id) { return document.querySelector('#kiosk-order-queue .btn-load-queued-order[data-order-id="' + id + '"]'); }
+function claimCount() { return h.requests.filter(request => request.path.includes('/claim/')).length; }
+function assertQueue(count) {
+    assert(Number($('#kiosk-queue-count').text().trim()) === count, 'Queue badge does not match the available order count.');
+    assert($('#kiosk-order-queue .btn-load-queued-order').length === count, 'Queue rows do not match the available orders.');
+    assert(!h.errors.length, 'Queue produced browser errors: ' + h.errors.join('; '));
+}
 async function waitFor(condition, message) {
     for (let attempt = 0; attempt < 100; attempt++) { if (condition()) return; await new Promise(r => setTimeout(r, 20)); }
     throw new Error(message);
@@ -268,6 +310,52 @@ try {
     $generation = Wait-PosReady
     $phaseOne = @'
 assertCart([], 0);
+assertQueue(2);
+assert(h.queueFetches >= 1, 'The kiosk queue was not fetched when POS opened.');
+const initialQueue = $('#kiosk-order-queue').text();
+assert(initialQueue.includes('KG-BROWSER') && initialQueue.includes('KG-ESCAPED')
+    && initialQueue.includes('Kiosk customer') && initialQueue.includes('391.00'), 'Queue order details are missing.');
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-load-queued-order'))
+    .map(button => button.dataset.orderId).join(',') === '42,43', 'The queue must preserve oldest-first ordering.');
+assert(initialQueue.includes('<img src=x onerror="window.__queueXss=true">')
+    && !$('#kiosk-order-queue img').length && !window.__queueXss, 'Queue customer names must render as literal text.');
+assert(queueButton(42).textContent.trim() === 'Load order' && !queueButton(42).disabled,
+    'A pending kiosk order must be available to load into an empty sale.');
+// Exercise empty queues and an older response arriving after a newer refresh.
+h.queueResponses.push({response: {status: 'success', data: []}});
+click('#btn-refresh-kiosk-queue');
+await waitFor(() => $('#kiosk-order-queue .btn-load-queued-order').length === 0,
+    'An empty queue response retained the old order rows.');
+assertQueue(0);
+assert($('#kiosk-order-queue').text().trim(), 'An empty kiosk queue needs a visible explanation.');
+h.queueResponses.push({delay: 120, ignoreAbort: true, response: {status: 'success', data: [
+    {kiosk_order_id: 44, reference_code: 'KG-STALE', customer_name: 'Stale queue response',
+        total_amount: 1, created_at: '2026-10-19 09:59:00', status: 'pending', item_count: 1}
+]}}, {delay: 5});
+const beforeFocusQueue = h.queueFetches;
+click('#btn-refresh-kiosk-queue');
+$(window).triggerHandler('focus');
+await waitFor(() => h.queueFetches >= beforeFocusQueue + 2 && queueButton(42), 'Window focus did not refresh the queue.');
+await new Promise(resolve => setTimeout(resolve, 150));
+assertQueue(2);
+assert(!$('#kiosk-order-queue').text().includes('KG-STALE'), 'A stale queue response overwrote the newer order list.');
+const queuePoll = h.intervals.find(interval => interval.milliseconds === 15000);
+assert(queuePoll && typeof queuePoll.callback === 'function', 'The kiosk queue must poll every 15 seconds.');
+const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+const beforeHiddenPoll = h.queueFetches;
+try {
+    Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+    queuePoll.callback();
+    assert(h.queueFetches === beforeHiddenPoll, 'A hidden POS page must not poll the queue.');
+    Object.defineProperty(document, 'hidden', {configurable: true, value: false});
+    queuePoll.callback();
+    await waitFor(() => h.queueFetches > beforeHiddenPoll && !$('#btn-refresh-kiosk-queue').prop('disabled'),
+        'The visible POS page did not poll the queue.');
+} finally {
+    if (hiddenDescriptor) Object.defineProperty(document, 'hidden', hiddenDescriptor);
+    else delete document.hidden;
+}
+assertQueue(2);
 const shortCard = $('.btn-add-product[data-id="6"]').closest('.product-card');
 assert($('.btn-add-product[data-id="6"]').prop('disabled') && shortCard.find('.badge').text() === 'Unavailable',
     'Stock-short POS products must remain visible with disabled Add controls.');
@@ -281,6 +369,23 @@ $(window).triggerHandler('focus');
 await waitFor(() => !$('.btn-add-product[data-id="6"]').prop('disabled'), 'POS focus refresh did not restore a restocked product.');
 click('.btn-add-product[data-id="6"]');
 assertCart([[6, 1, 5]], 5);
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-load-queued-order')).every(button => button.disabled),
+    'Queued-order Load buttons must be disabled while the current sale contains products.');
+const occupiedClaims = claimCount();
+$(queueButton(42)).prop('disabled', false).trigger('click');
+assert(claimCount() === occupiedClaims, 'A forced queue click replaced an occupied sale.');
+assertCart([[6, 1, 5]], 5);
+$(queueButton(42)).prop('disabled', true);
+h.queueResponses.push({failure: {status: 503, responseJSON: {message: 'Queue fixture temporarily unavailable.'}}});
+click('#btn-refresh-kiosk-queue');
+await waitFor(() => $('#kiosk-order-queue .btn-load-queued-order').length === 0, 'A failed queue fetch retained stale Load buttons.');
+assert($('#kiosk-queue-count').text().trim() !== '2', 'A queue error retained the previous count.');
+assert($('#kiosk-queue-message').text().trim() || $('#kiosk-order-queue').text().trim(), 'A queue failure needs a visible error.');
+assertCart([[6, 1, 5]], 5);
+click('#btn-refresh-kiosk-queue');
+await waitFor(() => queueButton(42), 'Manual queue refresh did not recover after a failed fetch.');
+assertQueue(2);
+assert(queueButton(42).disabled, 'Queue recovery enabled loading into an occupied sale.');
 h.products.find(product => product.product_id === 6).can_order = false;
 h.products.find(product => product.product_id === 6).stock_available = false;
 $(window).triggerHandler('focus');
@@ -350,14 +455,21 @@ click('.btn-decrease[data-id="1"]');
 assertCart([], 0);
 $('#customer_name').val('Stale name').trigger('input');
 $('#amount_paid').val('999.99');
-$('#kiosk-reference-input').val('KG-BROWSER');
-click('#btn-load-kiosk-order');
+const beforeClaimQueue = h.queueFetches;
+click('#kiosk-order-queue .btn-load-queued-order[data-order-id="42"]');
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-load-queued-order')).every(button => button.disabled),
+    'All queued-order Load buttons must lock during a claim.');
 click('.btn-add-product[data-id="3"]');
-click('#btn-load-kiosk-order');
+$(queueButton(42)).prop('disabled', false).trigger('click');
+$('#kiosk-reference-input').val('KG-BROWSER');
+$('#btn-load-kiosk-order').prop('disabled', false).trigger('click');
 assertCart([], 0);
-assert(h.requests.filter(x => x.path.includes('/claim/')).length === 1, 'Duplicate kiosk retrieval was allowed.');
+assert(claimCount() === 1, 'Duplicate queue or manual kiosk retrieval was allowed during a claim.');
 for (let attempt = 0; attempt < 100 && cart().length !== 2; attempt++) await new Promise(r => setTimeout(r, 20));
 assertCart([[1, 2, 125.5], [2, 1, 140]], 391);
+await waitFor(() => h.queueFetches > beforeClaimQueue && queueButton(42)
+    && queueButton(42).textContent.trim() === 'In current sale', 'Successful claim did not refresh and identify the current kiosk order.');
+assert(queueButton(42).disabled && queueButton(43).disabled, 'Claimed and other queue rows must stay disabled while the cart is occupied.');
 assert($('#customer_name').val() === 'Kiosk customer', 'Kiosk customer was not displayed.');
 assert(localStorage.getItem('pos_customer_name') === 'Kiosk customer', 'Retrieved customer was not persisted.');
 assert($('#amount_paid').val() === '', 'Retrieving a kiosk order must clear a previous payment.');
@@ -375,11 +487,21 @@ click('.btn-remove[data-id="2"]');
 click('.btn-remove[data-id="1"]');
 assertCart([], 0);
 assert(localStorage.getItem('pos_kiosk_order_id') === '42', 'Removing the final kiosk product lost the order context.');
+assert(!queueButton(42).disabled && queueButton(42).textContent.trim() === 'Resume order',
+    'An emptied current kiosk order must be available to resume.');
+// Keep manual-reference retrieval covered alongside the new queue entry point.
+$('#kiosk-reference-input').val(' kg-browser ');
+click('#btn-load-kiosk-order');
+await waitFor(() => cart().length === 2, 'Manual reference retrieval no longer resumes a kiosk order.');
+assertCart([[1, 2, 125.5], [2, 1, 140]], 391);
+assert(claimCount() === 2, 'Manual kiosk retrieval must use the same claim endpoint.');
+click('.btn-remove[data-id="2"]');
+click('.btn-remove[data-id="1"]');
 click('.btn-add-product[data-id="1"]');
 assertCart([[1, 1, 125.5]], 125.5);
 $('#customer_name').val('Edited kiosk customer').trigger('input');
 assertOffline();
-return 'Decimal-price totals, normal and kiosk add, quantity, individual removal, last-item removal, historical re-add, and pending-claim protection passed.';
+return 'Queue render/count/safe names, empty/error recovery, focus/stale refresh, queue/manual loading, claim/cart guards, decimal totals, and historical kiosk cart edits passed.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $phaseOne + '})()'))
     $null = Send-Cdp 'Page.reload' @{ignoreCache = $true}
@@ -389,8 +511,21 @@ assertCart([[1, 1, 125.5]], 125.5);
 assert($('#customer_name').val() === 'Edited kiosk customer', 'Customer edit did not survive reload.');
 assert(localStorage.getItem('pos_kiosk_order_id') === '42', 'Kiosk context did not survive reload.');
 assert($('#amount_paid').val() === '', 'A payment must not be restored from an earlier page load.');
+assertQueue(2);
+assert(queueButton(42).disabled && queueButton(42).textContent.trim() === 'In current sale',
+    'The reloaded queue must identify the existing current kiosk sale.');
 click('.btn-remove[data-id="1"]');
 assertCart([], 0);
+assert(!queueButton(42).disabled && queueButton(42).textContent.trim() === 'Resume order',
+    'An own-claimed kiosk order must remain resumable after reloading and emptying the cart.');
+const beforeResumeQueue = h.queueFetches;
+click('#kiosk-order-queue .btn-load-queued-order[data-order-id="42"]');
+await waitFor(() => cart().length === 2, 'The queue could not resume an own-claimed kiosk order after reload.');
+assertCart([[1, 2, 125.5], [2, 1, 140]], 391);
+await waitFor(() => h.queueFetches > beforeResumeQueue && !$('#btn-refresh-kiosk-queue').prop('disabled'),
+    'Resuming a kiosk order did not refresh the queue.');
+click('.btn-remove[data-id="2"]');
+click('.btn-remove[data-id="1"]');
 click('.btn-add-product[data-id="1"]');
 assertCart([[1, 1, 125.5]], 125.5);
 assert(cart()[0].product_name === 'Original Americano', 'Historical product name did not survive reload/re-add.');
@@ -410,7 +545,7 @@ assertCart([[1, 1, 999]], 999);
 click('.btn-remove[data-id="1"]');
 assertCart([], 0);
 assertOffline();
-return 'Reload preserves edited cart, kiosk context, historical price/name, and customer; New order clears context and payment. No checkout request was made.';
+return 'Reload preserves edited cart, historical kiosk data and customer; own-claimed queue orders resume; New order clears context and payment. No checkout request was made.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $phaseTwo + '})()'))
     $receiptPhase = @'
@@ -425,9 +560,15 @@ $('#amount_paid').val('100.00').trigger('input');
 assertChange(49.70);
 const previousKey = localStorage.getItem('pos_checkout_key');
 h.expectedCheckout = {key: previousKey};
+const beforeCheckoutQueue = h.queueFetches, beforeCheckoutClaims = claimCount();
+h.queueOrders = h.queueOrders.filter(order => order.kiosk_order_id !== 42);
 h.allowCheckout = true;
 click('#btnCheckout');
 assert($('#amount_paid').prop('disabled') && $('#btnCheckout').prop('disabled'), 'Payment controls must lock during checkout.');
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-load-queued-order')).every(button => button.disabled),
+    'Queue Load controls must remain disabled during checkout.');
+$(queueButton(42)).prop('disabled', false).trigger('click');
+assert(claimCount() === beforeCheckoutClaims, 'A forced queue click started a claim during checkout.');
 for (let attempt = 0; attempt < 100; attempt++) {
     if (document.querySelector('#transaction-details h4') && $('#transactionDetailsModal').hasClass('show')) break;
     await new Promise(r => setTimeout(r, 20));
@@ -458,8 +599,12 @@ assertCart([], 0);
 assert($('#amount_paid').val() === '' && !$('#amount_paid').prop('disabled') && !$('#btnCheckout').prop('disabled'),
     'Successful checkout must clear payment and unlock the controls.');
 assert(localStorage.getItem('pos_checkout_key') !== previousKey, 'Successful checkout must start a fresh order key.');
+await waitFor(() => h.queueFetches > beforeCheckoutQueue && !queueButton(42) && queueButton(43),
+    'Successful checkout did not fetch and display the fresh kiosk queue.');
+assertQueue(1);
+assert(!queueButton(43).disabled, 'Finishing checkout must re-enable queued orders for the new empty sale.');
 assertOffline(1);
-return 'One offline checkout sends the visible cart/payment/total/key, clears the cart, and automatically displays a complete sales receipt.';
+return 'One offline checkout sends the visible cart/payment/total/key, locks queue claims, clears the cart, refreshes the queue, and automatically displays a complete sales receipt.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $receiptPhase + '})()'))
     $null = Send-Cdp 'Page.navigate' @{url = ([uri]$kioskHtmlPath).AbsoluteUri}

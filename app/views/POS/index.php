@@ -1,3 +1,28 @@
+<section class="card card-primary card-outline mb-4" aria-labelledby="kiosk-queue-title">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between">
+        <h3 id="kiosk-queue-title" class="card-title">
+            Kiosk order queue <span id="kiosk-queue-count" class="badge badge-primary ml-2">0</span>
+        </h3>
+        <button type="button" id="btn-refresh-kiosk-queue" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-sync-alt mr-1" aria-hidden="true"></i> Refresh
+        </button>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-2">Oldest orders first. Waiting orders and orders you have retrieved appear here. Start a new sale before loading another order.</p>
+        <p id="kiosk-queue-message" class="small text-muted mb-2" role="status" aria-live="polite"></p>
+        <div class="table-responsive" style="max-height: 20rem;">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr><th>Reference</th><th>Customer</th><th>Items</th><th>Total</th><th>Received</th><th>Status</th><th class="text-right">Action</th></tr>
+                </thead>
+                <tbody id="kiosk-order-queue">
+                    <tr><td colspan="7" class="text-center text-muted py-3">Loading kiosk orders...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
 <div class="row">
 
     <div class="col-12 col-lg-8 mb-4 mb-lg-0">

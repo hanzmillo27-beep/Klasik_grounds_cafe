@@ -3,6 +3,8 @@
 namespace Api\POS;
 
 use Core\BaseController;
+use Core\Auth;
+use Models\Kiosk;
 use Models\POS;
 
 class POSController extends BaseController
@@ -33,6 +35,18 @@ class POSController extends BaseController
         }
 
         $this->json($product);
+    }
+
+    public function kioskOrders()
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use GET to load kiosk orders.']);
+        }
+        $this->json([
+            'status' => 'success',
+            'data' => (new Kiosk())->queue((int) (Auth::user()['id'] ?? 0))
+        ]);
     }
 
     public function transactions()

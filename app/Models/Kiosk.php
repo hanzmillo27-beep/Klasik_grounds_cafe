@@ -152,6 +152,28 @@ class Kiosk extends Model
         }
     }
 
+    public function queue(int $userId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT orders.kiosk_order_id, orders.reference_code, orders.customer_name,
+                orders.total_amount, orders.created_at, orders.status,
+                COALESCE(items.item_count, 0) AS item_count
+             FROM kiosk_orders orders
+             LEFT JOIN (
+                 SELECT kiosk_order_id, SUM(quantity) AS item_count
+                 FROM kiosk_order_items
+                 GROUP BY kiosk_order_id
+             ) items ON items.kiosk_order_id = orders.kiosk_order_id
+             WHERE orders.status = \'pending\'
+                OR (orders.status = \'claimed\' AND orders.claimed_by = ?)
+             ORDER BY orders.created_at, orders.kiosk_order_id'
+        );
+        $stmt->execute([$userId]);
+        $orders = $stmt->fetchAll();
+        foreach ($orders as $order) $order->item_count = (int) $order->item_count;
+        return $orders;
+    }
+
     public function findByReference($reference)
     {
         $stmt = $this->db->prepare(
