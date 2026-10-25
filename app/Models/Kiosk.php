@@ -17,7 +17,7 @@ class Kiosk extends Model
                 p.product_price,
                 p.product_image,
                 p.is_active, p.is_available,
-                ' . ProductAvailability::stockSql() . ' AS stock_available,
+                ' . Products::stockAvailabilitySql() . ' AS stock_available,
                 c.category_name
              FROM products p
              LEFT JOIN categories c
@@ -28,7 +28,7 @@ class Kiosk extends Model
 
         $products = $stmt->fetchAll();
         foreach ($products as $product) {
-            ProductAvailability::apply($product);
+            Products::applyAvailability($product);
             $product->product_image_url = SupabaseStorage::publicUrl($product->product_image ?? null);
         }
         return $products;
@@ -69,7 +69,7 @@ class Kiosk extends Model
 
                 $stmt = $this->db->prepare(
                     'SELECT p.product_id, p.product_name, p.product_price, p.is_active, p.is_available,
-                        ' . ProductAvailability::stockSql() . ' AS stock_available
+                        ' . Products::stockAvailabilitySql() . ' AS stock_available
                      FROM products p
                      WHERE p.product_id = ? AND p.is_active = TRUE AND p.is_available = TRUE'
                 );
@@ -80,7 +80,7 @@ class Kiosk extends Model
                 if (!$product) {
                     throw new \Exception('A product in your cart is no longer available.');
                 }
-                ProductAvailability::apply($product);
+                Products::applyAvailability($product);
                 if (!$product->can_order) throw new \Exception('A product in your cart is unavailable due to insufficient ingredients.');
 
                 $price = Money::cents($product->product_price) / 100;
@@ -99,7 +99,7 @@ class Kiosk extends Model
                 if ($totalCents > 9999999999) throw new \Exception('Order total exceeds the supported amount.');
             }
             $total = $totalCents / 100;
-            ProductAvailability::assertStock($this->db, $orderItems);
+            Products::assertStock($this->db, $orderItems);
 
             $reference = 'KG-' . strtoupper(bin2hex(random_bytes(4)));
 

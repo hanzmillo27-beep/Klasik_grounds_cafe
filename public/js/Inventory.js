@@ -5,6 +5,9 @@ $(document).ready(function () {
     let historyInventoryId = null;
     let historyRequest = null;
     let historyRequestNumber = 0;
+    let historyOpen = false;
+    let historySearchTimer = null;
+    let finishHistoryRequest = null;
 
     function escapeHtml(value) { return $('<div>').text(value == null ? '' : String(value)).html(); }
     function historyText(value, type) { return type === 'display' ? escapeHtml(value) : value; }
@@ -12,7 +15,13 @@ $(document).ready(function () {
         const quantity = Number(value || 0);
         return type === 'display' ? quantity.toLocaleString(undefined, {maximumFractionDigits: 3}) : quantity;
     }
+    function historyStockQuantity(value, type, row) {
+        if (row.entry_kind === 'sale_record' || value == null) return type === 'display' ? 'Not recorded' : '';
+        return historyQuantity(value, type);
+    }
     function historyAction(value, type, row) {
+        if (row.entry_kind === 'sale_record') return type === 'display'
+            ? 'Product sold<small class="d-block text-muted">Stock quantities not recorded</small>' : 'Product sold';
         const labels = {created: 'Created', restock: 'Restocked', adjustment: 'Stock adjusted', sale: 'Sale deduction', deleted: 'Deleted'};
         const details = [];
         if (value === 'adjustment') {
@@ -28,7 +37,7 @@ $(document).ready(function () {
         return escapeHtml(label) + (details.length ? '<small class="d-block text-muted">' + escapeHtml(details.join('; ')) + '</small>' : '');
     }
     function reloadVisibleHistory() {
-        if (historyTable && $('#inventory-history-modal').hasClass('show')) historyTable.ajax.reload(null, false);
+        if (historyTable && historyOpen) historyTable.ajax.reload(null, false);
     }
     function openHistory(item) {
         historyInventoryId = item ? Number(item.inv_id) : null;
@@ -36,6 +45,7 @@ $(document).ready(function () {
         $('#history-movement-type').val('');
         $('#inventory-history-error').text('').prop('hidden', true);
         if (historyTable) historyTable.search('');
+        $('#inventory-history-table_filter input').val('');
         $('#inventory-history-modal').modal('show');
     }
     $('#btnInventoryHistory').on('click', function () { openHistory(null); });
@@ -44,7 +54,9 @@ $(document).ready(function () {
         const item = table.rows().data().toArray().find(row => Number(row.inv_id) === id);
         if (item) openHistory(item);
     });
-    $('#inventory-history-modal').on('shown.bs.modal', function () {
+    $('#inventory-history-modal').on('show.bs.modal', function () {
+        historyOpen = true;
+    }).on('shown.bs.modal', function () {
         if (historyTable) {
             historyTable.ajax.reload(null, true);
             historyTable.columns.adjust();
@@ -55,15 +67,19 @@ $(document).ready(function () {
             pageLength: 10, lengthMenu: [10, 25, 50], ordering: false, order: [], searchDelay: 300,
             language: {emptyTable: 'No inventory history found.', zeroRecords: 'No matching history found.'},
             ajax: function (data, callback) {
+                function emptyResult() { callback({draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: []}); }
+                if (!historyOpen) { emptyResult(); return; }
                 const number = ++historyRequestNumber;
                 if (historyRequest && historyRequest.abort) historyRequest.abort();
+                finishHistoryRequest = emptyResult;
                 if (historyInventoryId !== null) data.inv_id = historyInventoryId;
                 const movementType = $('#history-movement-type').val();
                 if (movementType) data.movement_type = movementType;
                 $('#inventory-history-error').text('').prop('hidden', true);
                 function fail(message) {
                     $('#inventory-history-error').text(message).prop('hidden', false);
-                    callback({draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: []});
+                    finishHistoryRequest = null;
+                    emptyResult();
                 }
                 historyRequest = $.ajax({url: `${base_url}/api/Inventory/history`, type: 'GET', data: data, dataType: 'json'})
                     .done(function (response) {
@@ -72,6 +88,7 @@ $(document).ready(function () {
                             fail('Unable to load inventory history. Please refresh and try again.');
                             return;
                         }
+                        finishHistoryRequest = null;
                         callback(response);
                     }).fail(function (xhr, status) {
                         if (number !== historyRequestNumber || status === 'abort') return;
@@ -80,23 +97,45 @@ $(document).ready(function () {
             },
             columns: [
                 {data: 'created_at', render: historyText},
-                {data: 'inv_name', render: historyText},
+                {data: 'inv_name', render: function (value, type) { return historyText(value || 'Product name not recorded', type); }},
                 {data: 'movement_type', render: historyAction},
-                {data: 'quantity_change', render: function (value, type) { return (type === 'display' && Number(value) > 0 ? '+' : '') + historyQuantity(value, type); }},
-                {data: 'amount_before', render: historyQuantity},
-                {data: 'amount_after', render: historyQuantity},
-                {data: 'unit', render: historyText},
+                {data: 'quantity_change', render: function (value, type, row) {
+                    if (row.entry_kind === 'sale_record') return type === 'display' ? historyQuantity(row.sold_quantity, type) + ' sold' : Number(row.sold_quantity);
+                    return (type === 'display' && Number(value) > 0 ? '+' : '') + historyQuantity(value, type);
+                }},
+                {data: 'amount_before', render: historyStockQuantity},
+                {data: 'amount_after', render: historyStockQuantity},
+                {data: 'unit', render: function (value, type, row) { return historyText(row.entry_kind === 'sale_record' ? 'items' : value, type); }},
                 {data: 'actor_name', defaultContent: '', render: historyText},
                 {data: 'sale_id', orderable: false, defaultContent: '', render: function (value, type) { return historyText(value == null ? '—' : 'Sale #' + value, type); }}
             ]
         });
-        $('#inventory-history-table_filter input').attr('maxlength', 150);
-    }).on('hidden.bs.modal', function () {
+        const searchInput = $('#inventory-history-table_filter input').attr('maxlength', 150);
+        // Own this timer so closing the modal also cancels a queued search.
+        searchInput.off('.DT').off('mouseup').on('input.inventoryHistory search.inventoryHistory', function () {
+            clearTimeout(historySearchTimer);
+            historySearchTimer = setTimeout(function () {
+                historySearchTimer = null;
+                if (historyOpen && historyTable.search() !== searchInput.val()) historyTable.search(searchInput.val()).draw();
+            }, 300);
+        }).on('keydown.inventoryHistory', function (event) {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            clearTimeout(historySearchTimer);
+            historySearchTimer = null;
+            if (historyOpen && historyTable.search() !== searchInput.val()) historyTable.search(searchInput.val()).draw();
+        });
+    }).on('hide.bs.modal', function () {
+        historyOpen = false;
+        clearTimeout(historySearchTimer);
+        historySearchTimer = null;
         ++historyRequestNumber;
         if (historyRequest && historyRequest.abort) historyRequest.abort();
         historyRequest = null;
+        if (finishHistoryRequest) finishHistoryRequest();
+        finishHistoryRequest = null;
     });
-    $('#history-movement-type').on('change', function () { if (historyTable) historyTable.ajax.reload(null, true); });
+    $('#history-movement-type').on('change', function () { if (historyTable && historyOpen) historyTable.ajax.reload(null, true); });
     $('#btnRefreshInventoryHistory').on('click', reloadVisibleHistory);
 
 

@@ -141,6 +141,23 @@ class Inventory extends Model
 
     public function history(array $query): array
     {
+        $source = '(SELECT history_id, inv_id, inv_name, unit, movement_type,
+                amount_before, quantity_change, amount_after, min_stock, previous_inv_name,
+                previous_unit, previous_min_stock, actor_id, actor_name, sale_id, created_at,
+                \'stock\' AS entry_kind, NULL AS sold_quantity
+            FROM inventory_history
+            UNION ALL
+            SELECT si.sale_item_id AS history_id, NULL AS inv_id, si.product_name AS inv_name,
+                NULL AS unit, \'sale\' AS movement_type, NULL AS amount_before,
+                NULL AS quantity_change, NULL AS amount_after, NULL AS min_stock,
+                NULL AS previous_inv_name, NULL AS previous_unit, NULL AS previous_min_stock,
+                s.user_id AS actor_id, u.username AS actor_name, s.sale_id, s.sale_date AS created_at,
+                \'sale_record\' AS entry_kind, si.quantity AS sold_quantity
+            FROM sale_items si
+            INNER JOIN sales s ON s.sale_id = si.sale_id
+            LEFT JOIN users u ON u.id = s.user_id
+            WHERE NOT EXISTS (SELECT 1 FROM inventory_history captured
+                WHERE captured.sale_id = s.sale_id AND captured.movement_type = \'sale\')) history_entries';
         $draw = $this->pageInteger($query['draw'] ?? 0, 0, 2147483647);
         $start = $this->pageInteger($query['start'] ?? 0, 0, 2147483647);
         $length = $this->pageInteger($query['length'] ?? 10, 1, 100);
@@ -151,7 +168,7 @@ class Inventory extends Model
             $values[] = $this->pageInteger($query['inv_id'], 1, PHP_INT_MAX);
         }
         $scope = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
-        $count = $this->db->prepare('SELECT COUNT(*) FROM inventory_history' . $scope);
+        $count = $this->db->prepare('SELECT COUNT(*) FROM ' . $source . $scope);
         $count->execute($values);
         $total = (int) $count->fetchColumn();
 
@@ -179,14 +196,14 @@ class Inventory extends Model
             $conditions[] = '(' . implode(' OR ', $matches) . ')';
         }
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
-        $count = $this->db->prepare('SELECT COUNT(*) FROM inventory_history' . $where);
+        $count = $this->db->prepare('SELECT COUNT(*) FROM ' . $source . $where);
         $count->execute($values);
         $filtered = (int) $count->fetchColumn();
         // Ordering is fixed so a growing ledger always opens with the newest changes.
         $stmt = $this->db->prepare('SELECT history_id, inv_id, inv_name, unit, movement_type,
             amount_before, quantity_change, amount_after, min_stock, previous_inv_name,
-            previous_unit, previous_min_stock, actor_id, actor_name, sale_id, created_at
-            FROM inventory_history' . $where . ' ORDER BY created_at DESC, history_id DESC
+            previous_unit, previous_min_stock, actor_id, actor_name, sale_id, created_at, entry_kind, sold_quantity
+            FROM ' . $source . $where . ' ORDER BY created_at DESC, entry_kind, history_id DESC
             LIMIT ' . $length . ' OFFSET ' . $start);
         $stmt->execute($values);
         return ['draw'=>$draw, 'recordsTotal'=>$total, 'recordsFiltered'=>$filtered, 'data'=>$stmt->fetchAll()];

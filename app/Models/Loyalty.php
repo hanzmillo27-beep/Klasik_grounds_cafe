@@ -139,7 +139,7 @@ class Loyalty extends Model
             // a voucher validates stock but does not reserve or consume it.
             $stmt = $this->db->prepare(
                 'SELECT p.product_id, p.product_name, p.is_active, p.is_available,
-                    ' . ProductAvailability::stockSql() . ' AS stock_available
+                    ' . Products::stockAvailabilitySql() . ' AS stock_available
                  FROM products p WHERE p.product_id = ?' . $this->lockClause()
             );
             $stmt->execute([$productId]);
@@ -147,7 +147,7 @@ class Loyalty extends Model
             if (!$product) {
                 throw new \Exception('This item is no longer available. Choose another item.');
             }
-            ProductAvailability::apply($product);
+            Products::applyAvailability($product);
             if (!$product->can_order) {
                 throw new \Exception('This item is unavailable. Choose another item.');
             }

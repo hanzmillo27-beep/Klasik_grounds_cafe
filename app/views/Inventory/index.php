@@ -62,7 +62,7 @@
             </div>
             <div class="modal-body">
                 <p id="inventory-history-context" class="font-weight-bold">All inventory items</p>
-                <p class="text-muted small">History starts when this feature is enabled. Earlier stock changes are not included.</p>
+                <p class="text-muted small">Stock history starts when this feature is enabled. Earlier sales and sales without stock records show product quantities only; their stock quantities are not recorded.</p>
                 <div class="d-flex flex-wrap align-items-end mb-3">
                     <div class="mr-3 mb-2">
                         <label for="history-movement-type">Action</label>
@@ -71,7 +71,7 @@
                             <option value="created">Created</option>
                             <option value="restock">Restocked</option>
                             <option value="adjustment">Adjusted</option>
-                            <option value="sale">Sale deductions</option>
+                            <option value="sale">Sales</option>
                             <option value="deleted">Deleted</option>
                         </select>
                     </div>

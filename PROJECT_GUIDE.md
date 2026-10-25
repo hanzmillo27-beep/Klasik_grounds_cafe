@@ -293,6 +293,8 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 
 ### `app/Models/Products.php`
 
+- Shared availability logic lives here: `stockAvailabilitySql()` checks recipe stock in product queries, `applyAvailability()` sets ordering flags, and `assertStock()` checks the combined ingredient demand for an order. POS, Kiosk, and Loyalty use these methods.
+
 - `find()` joins categories and returns product rows plus public image URLs.
 - `findByID()` returns product details and its ingredient list.
 - `categories()` and `inventory()` provide form choices.
@@ -304,6 +306,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 
 - Creates, adjustments, restocks, and deletions record snapshots in `inventory_history` within the same database transaction as the inventory change. Metadata edits are logged even if quantity is unchanged; no-op saves are omitted.
 - `history()` reads paginated history and `recordHistory()` stores item names, units, before/change/after quantities, minimum-stock changes, the staff member, and an optional sale reference. Completed POS sales record the combined ingredient deduction once per ingredient. Failed writes and repeated checkout requests do not create extra entries.
+- Global history also reads saved `sales` and `sale_items` when a sale has no recorded stock movements. These rows show the saved product name and quantity sold, with stock quantities marked as not recorded. They do not change inventory, infer an old recipe, or add invented ledger entries. Item-specific history contains only movements linked to that inventory item.
 
 - Lists inventory and finds one item.
 - Adds or updates name, amount, and unit.
@@ -606,8 +609,8 @@ Before deploying this reward checkout flow, apply `php scripts/migrate.php 036_l
 
 ### Inventory history
 
-Inventory -> Inventory history (all items), or an item's history button -> GET `/api/Inventory/history` -> searchable, paginated movement snapshots. Entries show the action, quantity before and after, signed change, date and time in Asia/Manila, staff member, and sale ID for POS usage. Name, unit, and minimum-stock edits retain their previous values. History remains available after the item is deleted.
+Inventory -> Inventory history (all items), or an item's history button -> GET `/api/Inventory/history` -> searchable, paginated movement snapshots. Entries show the action, quantity before and after, signed change, date and time in Asia/Manila, staff member, and sale ID for POS usage. Name, unit, and minimum-stock edits retain their previous values. History remains available after the item is deleted. The global view also reads existing sales that have no recorded ingredient movements, showing their saved product quantities with unknown stock balances clearly marked. Sales that already have stock movements are not duplicated.
 
-Apply `php scripts/migrate.php 038_inventory_history.sql` with the PostgreSQL PDO extension enabled before deploying this feature. The migration creates the history table and indexes without changing current stock. History records new application changes from that point; older movements were not recorded and cannot be reconstructed. Direct SQL changes outside the application are not logged.
+Apply `php scripts/migrate.php 038_inventory_history.sql` with the PostgreSQL PDO extension enabled before deploying this feature. The migration creates the history table and indexes without changing current stock. Exact stock movement tracking starts from that point; older stock balances and ingredient usage were not recorded and cannot be reconstructed. Saved sales remain visible through the sales fallback. Products without ingredients do not deduct ingredient stock; configure their recipes in Products to track future deductions. Direct SQL changes outside the application are not logged.
 
 Focused checks: `php tests/inventory_history.php`, `php tests/inventory_history_api.php`, and `powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-inventory.ps1`. PostgreSQL checks can run using the existing isolated-schema runner, for example `php -d auto_prepend_file=tests/postgres.php tests/inventory_history.php`.
