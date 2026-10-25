@@ -1,10 +1,10 @@
 <?php
 require __DIR__ . '/product_fixture.php';
 
-$history = new Models\InventoryHistory($db);
+$history = new Models\Inventory($db);
 $db->beginTransaction();
 for ($index = 1; $index <= 25; $index++) {
-    $history->record([
+    $history->recordHistory([
         'inv_id'=>$index % 2 ? 1 : 2, 'inv_name'=>$index === 1 ? 'Beans 100%_special' : 'Beans',
         'unit'=>'g', 'movement_type'=>$index % 3 ? 'restock' : 'adjustment',
         'amount_before'=>'1.000', 'quantity_change'=>'0.001', 'amount_after'=>'1.001', 'min_stock'=>'0.500',
@@ -13,33 +13,33 @@ for ($index = 1; $index <= 25; $index++) {
 }
 $db->commit();
 $db->exec("UPDATE inventory_history SET created_at = '2026-10-25 08:00:00'");
-$page = $history->page(['draw'=>'2', 'start'=>'0', 'length'=>'10']);
+$page = $history->history(['draw'=>'2', 'start'=>'0', 'length'=>'10']);
 check($page['draw'] === 2 && $page['recordsTotal'] === 25 && $page['recordsFiltered'] === 25
     && count($page['data']) === 10 && (int) $page['data'][0]->history_id === 25
     && (int) $page['data'][9]->history_id === 16,
     'History must have bounded, deterministic newest-first pages and integer draw/counts.');
-$second = $history->page(['start'=>10, 'length'=>10]);
+$second = $history->history(['start'=>10, 'length'=>10]);
 check((int) $second['data'][0]->history_id === 15 && count($second['data']) === 10,
     'The second history page must not repeat the first page.');
-$item = $history->page(['inv_id'=>1, 'length'=>100]);
+$item = $history->history(['inv_id'=>1, 'length'=>100]);
 check($item['recordsTotal'] === 13 && count($item['data']) === 13
     && array_unique(array_map(fn($row)=>(int) $row->inv_id, $item['data'])) === [1],
     'An item filter must scope history and its total count.');
-$filtered = $history->page(['inv_id'=>1, 'movement_type'=>'adjustment', 'length'=>100]);
+$filtered = $history->history(['inv_id'=>1, 'movement_type'=>'adjustment', 'length'=>100]);
 check($filtered['recordsTotal'] === 13 && $filtered['recordsFiltered'] === 4,
     'History action filters must compose with item scope.');
 foreach (['100%_', 'ORIGINAL BEANS'] as $term) {
-    $result = $history->page(['search'=>['value'=>$term]]);
+    $result = $history->history(['search'=>['value'=>$term]]);
     check($result['recordsFiltered'] === 1 && (int) $result['data'][0]->history_id === 1,
         'Search must support saved previous names, case-insensitive text, and literal SQL wildcards.');
 }
-check($history->page(['search'=>['value'=>"' OR 1=1 --"]])['recordsFiltered'] === 0,
+check($history->history(['search'=>['value'=>"' OR 1=1 --"]])['recordsFiltered'] === 0,
     'Search values must be bound as data.');
-check($history->page(['inv_id'=>999])['data'] === [], 'Unknown or deleted item history may be empty.');
-$before = json_encode($history->page(['length'=>100]));
+check($history->history(['inv_id'=>999])['data'] === [], 'Unknown or deleted item history may be empty.');
+$before = json_encode($history->history(['length'=>100]));
 $db->exec('DELETE FROM inventory WHERE inv_id = 1');
 $db->exec("UPDATE users SET username = 'Renamed user' WHERE id = 1");
-check(json_encode($history->page(['length'=>100])) === $before,
+check(json_encode($history->history(['length'=>100])) === $before,
     'Reading history must use saved item and actor snapshots after entity deletion or renaming.');
 
 class TestInventoryHistoryController extends Api\Inventory\InventoryController {

@@ -4,7 +4,6 @@ namespace Api\Inventory;
 
 use Core\BaseController;
 use Models\Inventory;
-use Models\InventoryHistory;
 
 class InventoryController extends BaseController
 {
@@ -30,7 +29,7 @@ class InventoryController extends BaseController
             return;
         }
         try {
-            $result = (new InventoryHistory())->page($_GET);
+            $result = $this->Inventory->history($_GET);
         } catch (\InvalidArgumentException $error) {
             http_response_code(400);
             $this->json(['status'=>'error', 'message'=>$error->getMessage()]);

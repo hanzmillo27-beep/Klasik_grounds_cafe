@@ -303,7 +303,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 ### `app/Models/Inventory.php`
 
 - Creates, adjustments, restocks, and deletions record snapshots in `inventory_history` within the same database transaction as the inventory change. Metadata edits are logged even if quantity is unchanged; no-op saves are omitted.
-- `InventoryHistory` stores item names, units, before/change/after quantities, minimum-stock changes, the staff member, and an optional sale reference. Completed POS sales record the combined ingredient deduction once per ingredient. Failed writes and repeated checkout requests do not create extra entries.
+- `history()` reads paginated history and `recordHistory()` stores item names, units, before/change/after quantities, minimum-stock changes, the staff member, and an optional sale reference. Completed POS sales record the combined ingredient deduction once per ingredient. Failed writes and repeated checkout requests do not create extra entries.
 
 - Lists inventory and finds one item.
 - Adds or updates name, amount, and unit.

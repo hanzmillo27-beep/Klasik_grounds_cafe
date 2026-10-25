@@ -484,7 +484,7 @@ class POS extends Model
                 if ($deductInventory->rowCount() !== 1) throw new \Exception('Inventory changed during checkout. Please try again.');
                 $before = $inventoryBefore[$inventoryId];
                 $beforeUnits = (int) round((float) $before->amount * 1000);
-                (new InventoryHistory($this->db))->record([
+                (new Inventory($this->db))->recordHistory([
                     'inv_id' => $inventoryId, 'inv_name' => $before->inv_name, 'unit' => $before->unit,
                     'movement_type' => 'sale', 'amount_before' => $beforeUnits / 1000,
                     'quantity_change' => -$requiredUnits / 1000, 'amount_after' => ($beforeUnits - $requiredUnits) / 1000,
