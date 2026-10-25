@@ -50,6 +50,7 @@ class Auth{
         if (strtolower($area) === 'api' && in_array($module, ['products', 'inventory'], true)) {
             if ($role === 'staff' && $module === 'inventory' && $action === 'restock') return true;
             return in_array($action, ['all', 'categories', 'inventory', 'products', 'product'], true)
+                || ($module === 'inventory' && $action === 'history')
                 || ($action === 'edit' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET');
         }
         return true;

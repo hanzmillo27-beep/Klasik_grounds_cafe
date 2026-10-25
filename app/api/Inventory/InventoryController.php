@@ -4,6 +4,7 @@ namespace Api\Inventory;
 
 use Core\BaseController;
 use Models\Inventory;
+use Models\InventoryHistory;
 
 class InventoryController extends BaseController
 {
@@ -19,6 +20,27 @@ class InventoryController extends BaseController
         $this->json([
             'data' => $this->Inventory->find()
         ]);
+    }
+
+    public function history()
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+            http_response_code(405);
+            $this->json(['status'=>'error', 'message'=>'Use GET to load inventory history.']);
+            return;
+        }
+        try {
+            $result = (new InventoryHistory())->page($_GET);
+        } catch (\InvalidArgumentException $error) {
+            http_response_code(400);
+            $this->json(['status'=>'error', 'message'=>$error->getMessage()]);
+            return;
+        } catch (\PDOException $error) {
+            http_response_code(500);
+            $this->json(['status'=>'error', 'message'=>'Unable to load inventory history. Please try again.']);
+            return;
+        }
+        $this->json($result);
     }
 
     public function add()
@@ -67,7 +89,9 @@ class InventoryController extends BaseController
             ]);
         }
 
-        if (!$this->Inventory->restock($id, $amount)) {
+        try { $restocked = $this->Inventory->restock($id, $amount); }
+        catch (\PDOException $error) { $restocked = false; }
+        if (!$restocked) {
             $this->json([
                 'status' => 'error',
                 'message' => 'Unable to replenish stock. Check the item and maximum quantity.'
@@ -98,14 +122,21 @@ class InventoryController extends BaseController
     }
     public function delete($id)
     {
-        if (empty($id)) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error', 'message'=>'Use POST to delete inventory.']);
+        }
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) {
             $this->json([
                 'status' => 'error',
                 'message' => 'Inventory ID is required.'
             ]);
         }
 
-        if ($this->Inventory->delete($id)) {
+        try { $deleted = $this->Inventory->delete($id); }
+        catch (\PDOException $error) { $deleted = false; }
+        if ($deleted) {
             $this->json([
                 'status' => 'success',
                 'message' => 'Inventory item deleted successfully.'
@@ -114,7 +145,7 @@ class InventoryController extends BaseController
 
         $this->json([
             'status' => 'error',
-            'message' => 'Unable to delete inventory item.'
+            'message' => 'Unable to delete inventory item. It may still be used by a product recipe.'
         ]);
     }
 }

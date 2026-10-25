@@ -8,6 +8,7 @@
 
         <div class="card-tools ml-auto mt-2 mt-sm-0">
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshInventory">Refresh stock</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnInventoryHistory">Inventory history</button>
 
             <?php if (\Core\Auth::canAccess('Inventory', 'add', 'Api')): ?>
             <button
@@ -50,6 +51,43 @@
 
     </div>
 
+</div>
+
+<div class="modal fade" id="inventory-history-modal" tabindex="-1" aria-labelledby="inventory-history-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="inventory-history-title">Inventory history</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p id="inventory-history-context" class="font-weight-bold">All inventory items</p>
+                <p class="text-muted small">History starts when this feature is enabled. Earlier stock changes are not included.</p>
+                <div class="d-flex flex-wrap align-items-end mb-3">
+                    <div class="mr-3 mb-2">
+                        <label for="history-movement-type">Action</label>
+                        <select id="history-movement-type" class="form-control form-control-sm">
+                            <option value="">All actions</option>
+                            <option value="created">Created</option>
+                            <option value="restock">Restocked</option>
+                            <option value="adjustment">Adjusted</option>
+                            <option value="sale">Sale deductions</option>
+                            <option value="deleted">Deleted</option>
+                        </select>
+                    </div>
+                    <button type="button" id="btnRefreshInventoryHistory" class="btn btn-outline-secondary btn-sm mb-2">Refresh history</button>
+                </div>
+                <div id="inventory-history-error" class="alert alert-danger" role="alert" hidden></div>
+                <div class="table-responsive">
+                    <table id="inventory-history-table" class="table table-bordered table-striped w-100">
+                        <thead><tr><th>Date</th><th>Item</th><th>Action</th><th>Change</th><th>Before</th><th>After</th><th>Unit</th><th>By</th><th>Reference</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button></div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="restock-modal" tabindex="-1">

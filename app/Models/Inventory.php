@@ -49,45 +49,30 @@ class Inventory extends Model
         if ($this->validationError($data) !== null) return false;
         $data['inv_name'] = trim($data['inv_name']);
         $data['unit'] = trim($data['unit']);
-        $data['amount'] = round((float) $data['amount'], 3);
-        $minimum = $data['min_stock'] ?? (!empty($data['inv_id']) ? $this->findByID($data['inv_id'])->min_stock : 10);
-        if (!empty($data['inv_id'])) {
-
-            $stmt = $this->db->prepare(
-                'UPDATE inventory
-                 SET inv_name = ?,
-                     amount = ?,
-                     min_stock = ?,
-                     unit = ?
-                 WHERE inv_id = ?'
-            );
-
-            return $stmt->execute([
-                $data['inv_name'],
-                $data['amount'],
-                $minimum,
-                $data['unit'],
-                $data['inv_id'],
-            ]);
-        }
-
-        $stmt = $this->db->prepare(
-            'INSERT INTO inventory
-            (
-                inv_name,
-                amount,
-                min_stock,
-                unit
-            )
-            VALUES (?, ?, ?, ?)'
-        );
-
-        return $stmt->execute([
-            $data['inv_name'],
-            $data['amount'],
-            $minimum,
-            $data['unit'],
-        ]);
+        return $this->mutate(function () use ($data): bool {
+            $id = !empty($data['inv_id']) ? (int) $data['inv_id'] : null;
+            $before = $id === null ? null : $this->lockedItem($id);
+            if ($id !== null && !$before) return false;
+            $after = (object) [
+                'inv_id' => $id, 'inv_name' => $data['inv_name'], 'unit' => $data['unit'],
+                'amount' => number_format((float) $data['amount'], 3, '.', ''),
+                'min_stock' => number_format((float) ($data['min_stock'] ?? ($before->min_stock ?? 10)), 3, '.', ''),
+            ];
+            if ($before && $before->inv_name === $after->inv_name && $before->unit === $after->unit
+                && self::units($before->amount) === self::units($after->amount)
+                && self::units($before->min_stock) === self::units($after->min_stock)) return true;
+            if ($before) {
+                $stmt = $this->db->prepare('UPDATE inventory SET inv_name = ?, amount = ?, min_stock = ?, unit = ? WHERE inv_id = ?');
+                $stmt->execute([$after->inv_name, $after->amount, $after->min_stock, $after->unit, $id]);
+                if ($stmt->rowCount() !== 1) return false;
+            } else {
+                $stmt = $this->db->prepare('INSERT INTO inventory (inv_name, amount, min_stock, unit) VALUES (?, ?, ?, ?)');
+                $stmt->execute([$after->inv_name, $after->amount, $after->min_stock, $after->unit]);
+                $after->inv_id = (int) $this->db->lastInsertId();
+            }
+            $this->recordChange($before ? 'adjustment' : 'created', $before, $after);
+            return true;
+        });
     }
 
     public function validationError(array $data): ?string
@@ -109,15 +94,19 @@ class Inventory extends Model
     {
         $id = filter_var($id, FILTER_VALIDATE_INT);
         if (!$id || $id < 1 || !self::validQuantity($amount, false)) return false;
-        $amount = number_format((float) $amount, 3, '.', '');
-        $stmt = $this->db->prepare(
-            'UPDATE inventory
-             SET amount = ROUND(amount + ?, 3)
-             WHERE inv_id = ? AND amount <= ROUND(999999999.999 - ?, 3)'
-        );
-
-        $stmt->execute([$amount, $id, $amount]);
-        return $stmt->rowCount() === 1;
+        return $this->mutate(function () use ($id, $amount): bool {
+            $before = $this->lockedItem($id);
+            if (!$before) return false;
+            $newUnits = self::units($before->amount) + self::units($amount);
+            if ($newUnits > 999999999999) return false;
+            $after = clone $before;
+            $after->amount = number_format($newUnits / 1000, 3, '.', '');
+            $stmt = $this->db->prepare('UPDATE inventory SET amount = ? WHERE inv_id = ? AND amount = ?');
+            $stmt->execute([$after->amount, $id, $before->amount]);
+            if ($stmt->rowCount() !== 1) return false;
+            $this->recordChange('restock', $before, $after);
+            return true;
+        });
     }
 
     public static function validQuantity($amount, bool $allowZero = true): bool
@@ -130,11 +119,58 @@ class Inventory extends Model
 
     public function delete($id): bool
     {
-        $stmt = $this->db->prepare(
-            'DELETE FROM inventory
-             WHERE inv_id = ?'
-        );
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) return false;
+        return $this->mutate(function () use ($id): bool {
+            $before = $this->lockedItem($id);
+            if (!$before) return false;
+            $stmt = $this->db->prepare('DELETE FROM inventory WHERE inv_id = ?');
+            $stmt->execute([$id]);
+            if ($stmt->rowCount() !== 1) return false;
+            $this->recordChange('deleted', $before, null);
+            return true;
+        });
+    }
 
-        return $stmt->execute([$id]);
+    private function lockedItem(int $id): ?object
+    {
+        $stmt = $this->db->prepare('SELECT inv_id, inv_name, amount, min_stock, unit FROM inventory WHERE inv_id = ?' . $this->lockClause());
+        $stmt->execute([$id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    private static function units($amount): int
+    {
+        return (int) round((float) $amount * 1000);
+    }
+
+    private function recordChange(string $type, ?object $before, ?object $after): void
+    {
+        $item = $after ?? $before;
+        $beforeUnits = $before ? self::units($before->amount) : 0;
+        $afterUnits = $after ? self::units($after->amount) : 0;
+        (new InventoryHistory($this->db))->record([
+            'inv_id' => $item->inv_id, 'inv_name' => $item->inv_name, 'unit' => $item->unit,
+            'movement_type' => $type, 'amount_before' => $beforeUnits / 1000,
+            'quantity_change' => ($afterUnits - $beforeUnits) / 1000, 'amount_after' => $afterUnits / 1000,
+            'min_stock' => $item->min_stock, 'previous_inv_name' => $before->inv_name ?? null,
+            'previous_unit' => $before->unit ?? null, 'previous_min_stock' => $before->min_stock ?? null,
+        ]);
+    }
+
+    private function mutate(callable $operation): bool
+    {
+        $started = false;
+        try {
+            $this->db->beginTransaction();
+            $started = true;
+            $saved = $operation();
+            if ($saved) $this->db->commit();
+            else $this->db->rollBack();
+            return $saved;
+        } catch (\Throwable $error) {
+            if ($started && $this->db->inTransaction()) $this->db->rollBack();
+            return false;
+        }
     }
 }

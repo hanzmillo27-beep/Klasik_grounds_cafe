@@ -16,6 +16,17 @@ $db->exec('CREATE TABLE inventory (
     min_stock NUMERIC(12,3) NOT NULL DEFAULT 10,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )');
+$db->exec('CREATE TABLE inventory_history (
+    history_id ' . $identity . ', inv_id INTEGER NOT NULL,
+    inv_name VARCHAR(150) NOT NULL, unit VARCHAR(30) NOT NULL,
+    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN (\'created\', \'restock\', \'adjustment\', \'sale\', \'deleted\')),
+    amount_before NUMERIC(12,3) NOT NULL CHECK (amount_before >= 0), quantity_change NUMERIC(12,3) NOT NULL,
+    amount_after NUMERIC(12,3) NOT NULL CHECK (amount_after >= 0), min_stock NUMERIC(12,3) NOT NULL,
+    previous_inv_name VARCHAR(150), previous_unit VARCHAR(30), previous_min_stock NUMERIC(12,3),
+    actor_id INTEGER, actor_name VARCHAR(100), sale_id INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (ROUND(amount_before + quantity_change, 3) = amount_after)
+)');
 $db->exec('CREATE TABLE products (
     product_id ' . $identity . ', product_name VARCHAR(150) NOT NULL,
     category_id INTEGER NOT NULL REFERENCES categories(category_id),

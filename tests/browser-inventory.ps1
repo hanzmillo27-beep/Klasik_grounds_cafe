@@ -2,7 +2,7 @@ param([string]$BrowserPath = '', [string]$PhpPath = '', [int]$DebugPort = 0)
 
 # Offline regression for the actual inventory PHP view, DataTables, and Inventory.js.
 # The renderer requires the isolated SQLite test fixture, never app configuration.
-# AJAX permits only the list GET; no form submission or CRUD endpoint is exercised.
+# AJAX permits only list/history GET fixtures; no CRUD or application DB is used.
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $BrowserPath) {
@@ -51,10 +51,28 @@ $inventoryUri = ([uri](Join-Path $projectRoot 'public/js/Inventory.js')).Absolut
 $fixtures = @'
 window.base_url = 'http://inventory-fixture.invalid';
 window.__inventoryHarness = {
-    errors: [], requests: [], nextAmount: '2.345',
+    errors: [], requests: [], nextAmount: '2.345', listFetches: 0, historyResponses: [],
     hostileName: '<img src=x onerror="window.__inventoryInjected=true">',
     hostileUnit: '<b data-injected="unit">kg</b>'
 };
+const h = __inventoryHarness;
+h.history = [
+    {history_id: 20, inv_id: 1, inv_name: 'Trace stock', unit: 'kg', movement_type: 'sale',
+        amount_before: '2.346', quantity_change: '-0.001', amount_after: '2.345', actor_name: '<b data-injected="actor">Cashier</b>',
+        sale_id: 77, created_at: '2026-10-25 12:00:00'},
+    {history_id: 19, inv_id: 3, inv_name: h.hostileName, unit: h.hostileUnit, movement_type: 'adjustment',
+        amount_before: '1.234', quantity_change: '0.000', amount_after: '1.234', actor_name: 'Owner', sale_id: null,
+        created_at: '2026-10-25 11:00:00', previous_inv_name: '<b data-injected="old-name">Old name</b>',
+        previous_unit: 'g', previous_min_stock: '0.001', min_stock: '1.000'},
+    {history_id: 18, inv_id: 1, inv_name: 'Trace stock', unit: 'kg', movement_type: 'restock',
+        amount_before: '0.000', quantity_change: '2.345', amount_after: '2.345', actor_name: 'Owner', sale_id: null, created_at: '2026-10-25 10:00:00'},
+    {history_id: 17, inv_id: 1, inv_name: 'Trace stock', unit: 'kg', movement_type: 'created',
+        amount_before: '0.000', quantity_change: '0.001', amount_after: '0.001', actor_name: 'Owner', sale_id: null, created_at: '2026-10-25 09:00:00'},
+    {history_id: 16, inv_id: 9, inv_name: 'Retired ingredient', unit: 'g', movement_type: 'deleted',
+        amount_before: '1.000', quantity_change: '-1.000', amount_after: '0.000', actor_name: 'Owner', sale_id: null, created_at: '2026-10-24 12:00:00'}
+].concat(Array.from({length: 12}, (_, index) => ({history_id: 15 - index, inv_id: 2, inv_name: 'Zero stock',
+    unit: 'g', movement_type: 'restock', amount_before: index, quantity_change: '1.000', amount_after: index + 1,
+    actor_name: 'Staff', sale_id: null, created_at: '2026-10-23 10:00:00'})));
 window.addEventListener('error', event => __inventoryHarness.errors.push(event.message || 'Browser resource error.'));
 window.addEventListener('unhandledrejection', event => __inventoryHarness.errors.push(String(event.reason)));
 window.alert = message => __inventoryHarness.errors.push('Unexpected browser alert: ' + message);
@@ -63,22 +81,44 @@ window.handleAjaxError = function () { __inventoryHarness.errors.push('Unexpecte
 $.ajax = function (options) {
     const h = __inventoryHarness, path = new URL(options.url).pathname;
     const method = String(options.type || options.method || 'GET').toUpperCase();
-    h.requests.push({path: path, method: method});
-    if (path !== '/api/Inventory/all' || method !== 'GET') {
+    h.requests.push({path: path, method: method, data: JSON.parse(JSON.stringify(options.data || {}))});
+    if (!['/api/Inventory/all', '/api/Inventory/history'].includes(path) || method !== 'GET') {
         h.errors.push('Disallowed request: ' + method + ' ' + path);
-        throw new Error('Only the offline inventory list GET is allowed.');
+        throw new Error('Only offline inventory list/history GET fixtures are allowed.');
     }
     const deferred = $.Deferred(), xhr = deferred.promise();
     xhr.readyState = 1;
     xhr.abort = function () { xhr.readyState = 0; deferred.reject(xhr, 'abort', 'abort'); };
-    const response = {data: [
-        {inv_id: 1, inv_name: 'Trace stock', amount: h.requests.length === 1 ? '0.001' : h.nextAmount,
-            unit: 'kg', min_stock: '0.001', is_low: h.requests.length === 1},
+    let response, fixture = {};
+    if (path === '/api/Inventory/all') {
+        h.listFetches++;
+        response = {data: [
+        {inv_id: 1, inv_name: 'Trace stock', amount: h.listFetches === 1 ? '0.001' : h.nextAmount,
+            unit: 'kg', min_stock: '0.001', is_low: h.listFetches === 1},
         {inv_id: 2, inv_name: 'Zero stock', amount: '0.000', unit: 'g', min_stock: '0.000', is_low: true},
         {inv_id: 3, inv_name: h.hostileName, amount: '1.234', unit: h.hostileUnit, min_stock: '1.000', is_low: false}
-    ]};
+        ]};
+    } else {
+        const data = options.data;
+        fixture = h.historyResponses.shift() || {};
+        const scoped = h.history.filter(row => !data.inv_id || Number(row.inv_id) === Number(data.inv_id));
+        const query = String(data.search && data.search.value || '').toLowerCase();
+        const filtered = scoped.filter(row => (!data.movement_type || row.movement_type === data.movement_type)
+            && (!query || Object.values(row).some(value => String(value).toLowerCase().includes(query))));
+        const start = Number(data.start || 0), length = Number(data.length || 10);
+        response = {draw: Number(data.draw), recordsTotal: scoped.length, recordsFiltered: filtered.length,
+            data: filtered.slice(start, start + length)};
+    }
     setTimeout(function () {
+        if (xhr.readyState === 0) return;
         xhr.readyState = 4;
+        if (fixture.failure) {
+            Object.assign(xhr, fixture.failure);
+            if (typeof options.error === 'function') options.error(xhr, 'error');
+            deferred.reject(xhr, 'error');
+            if (typeof options.complete === 'function') options.complete(xhr, 'error');
+            return;
+        }
         if (typeof options.success === 'function') options.success(response, 'success', xhr);
         deferred.resolve(response, 'success', xhr);
         if (typeof options.complete === 'function') options.complete(xhr, 'success');
@@ -205,8 +245,107 @@ try {
         'Refresh must update stock status while preserving the item threshold.');
     safeText();
     assert(!h.errors.length && h.requests.every(request => request.method === 'GET' && request.path === '/api/Inventory/all'),
-        'The browser must use only the offline inventory list GET: ' + h.errors.join('; '));
-    return 'Inventory browser checks passed: stock precision, per-item thresholds, equality/zero/above-threshold status, safe text, and Refresh. No CRUD or external requests.';
+        'History must not be requested until it is opened: ' + h.errors.join('; '));
+    async function waitFor(condition, message) {
+        for (let attempt = 0; attempt < 100; attempt++) {
+            if (condition()) return;
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        throw new Error(message);
+    }
+    function historyRequests() { return h.requests.filter(request => request.path === '/api/Inventory/history'); }
+    function lastHistoryRequest() { return historyRequests()[historyRequests().length - 1].data; }
+    function closeHistory() {
+        return new Promise(resolve => $('#inventory-history-modal').one('hidden.bs.modal', resolve).modal('hide'));
+    }
+    const historyButton = document.querySelector('#btnInventoryHistory');
+    assert(historyButton && !historyButton.disabled && $('#inventory-table .btn-history').length === 3,
+        'Global and per-item inventory history actions are missing.');
+    historyButton.click();
+    await waitFor(() => $.fn.dataTable.isDataTable('#inventory-history-table')
+        && $('#inventory-history-table').DataTable().rows().count() === 10, 'All inventory history did not load.');
+    const history = $('#inventory-history-table').DataTable();
+    assert(history.settings()[0].oFeatures.bServerSide && !lastHistoryRequest().inv_id
+        && Number(lastHistoryRequest().start) === 0 && Number(lastHistoryRequest().length) === 10,
+        'History must request its first server-side page without an item filter.');
+    assert(lastHistoryRequest().draw > 0 && !history.settings()[0].oFeatures.bSort
+        && lastHistoryRequest().order.length === 0, 'History must retain the server newest-first order and send its DataTables draw.');
+    assert($('#inventory-history-table_filter input').attr('maxlength') === '150', 'History search must enforce the server search length limit.');
+    const historyText = $('#inventory-history-table tbody').text();
+    assert(historyText.includes('-0.001') && historyText.includes('+2.345') && historyText.includes('2.346')
+        && historyText.includes('2.345') && historyText.includes('Sale #77'), 'History lost signed stock precision, before/after values, or sale reference.');
+    assert(historyText.includes('Details updated') && historyText.includes('Stock unchanged')
+        && historyText.includes('<b data-injected="old-name">Old name</b>'), 'Metadata-only adjustments must explain the change without changing stock.');
+    assert(historyText.includes(h.hostileName) && historyText.includes(h.hostileUnit)
+        && historyText.includes('<b data-injected="actor">Cashier</b>')
+        && !$('#inventory-history-table img, #inventory-history-table [data-injected]').length
+        && !window.__inventoryInjected, 'History text or metadata created unsafe HTML.');
+    assert($('#inventory-history-modal').text().includes('Earlier stock changes are not included'),
+        'History must explain that earlier changes are not recorded retrospectively.');
+    history.page('next').draw('page');
+    await waitFor(() => Number(lastHistoryRequest().start) === 10 && history.rows().count() === 7,
+        'History pagination did not request the next server page.');
+    history.search('Retired ingredient').draw();
+    await waitFor(() => history.rows().count() === 1 && history.row(0).data().inv_id === 9,
+        'Server-side history search did not find a deleted inventory item.');
+    assert(lastHistoryRequest().search.value === 'Retired ingredient' && Number(lastHistoryRequest().start) === 0,
+        'History search must send its term and reset pagination.');
+    history.search('');
+    $('#history-movement-type').val('sale').trigger('change');
+    await waitFor(() => history.rows().count() === 1 && history.row(0).data().movement_type === 'sale',
+        'The movement-type filter did not restrict history.');
+    assert(lastHistoryRequest().movement_type === 'sale', 'The movement type was not sent to the history endpoint.');
+    const beforeError = historyRequests().length;
+    h.historyResponses.push({failure: {status: 503, responseJSON: {message: '<b data-injected="error">History unavailable</b>'}}});
+    $('#btnRefreshInventoryHistory').trigger('click');
+    await waitFor(() => historyRequests().length > beforeError && !$('#inventory-history-error').prop('hidden')
+        && history.rows().count() === 0, 'History failure did not clear stale records and show an error.');
+    assert($('#inventory-history-error').text() === '<b data-injected="error">History unavailable</b>'
+        && !$('#inventory-history-error [data-injected]').length, 'History server errors must render as safe text.');
+    $('#btnRefreshInventoryHistory').trigger('click');
+    await waitFor(() => $('#inventory-history-error').prop('hidden') && history.rows().count() === 1,
+        'Refreshing history did not recover after a failed request.');
+    history.search('No such movement').draw();
+    await waitFor(() => history.rows().count() === 0 && $('#inventory-history-table tbody').text().includes('No matching history'),
+        'A history search with no results needs an empty state.');
+    await closeHistory();
+    const beforeItem = historyRequests().length;
+    $('#inventory-table .btn-history[data-id="3"]').trigger('click');
+    await waitFor(() => historyRequests().length > beforeItem && history.rows().count() === 1
+        && history.row(0).data().inv_id === 3, 'Per-item history did not send the inventory item filter.');
+    assert(Number(lastHistoryRequest().inv_id) === 3 && !lastHistoryRequest().movement_type
+        && lastHistoryRequest().search.value === '', 'Opening an item must reset old search and movement filters.');
+    assert($('#inventory-history-context').text() === 'Item: ' + h.hostileName
+        && !$('#inventory-history-context img').length, 'History item context must render its name safely.');
+    const beforeRefresh = historyRequests().length;
+    h.history.unshift({history_id: 21, inv_id: 3, inv_name: h.hostileName, unit: h.hostileUnit,
+        movement_type: 'restock', amount_before: '1.234', quantity_change: '0.001', amount_after: '1.235',
+        actor_name: 'Owner', sale_id: null, created_at: '2026-10-25 13:00:00'});
+    $('#btnRefreshInventoryHistory').trigger('click');
+    await waitFor(() => historyRequests().length > beforeRefresh && history.rows().count() === 2,
+        'Refresh did not fetch the newest item history.');
+    assert(Number(lastHistoryRequest().inv_id) === 3 && $('#inventory-history-table tbody').text().includes('+0.001'),
+        'Refresh lost the item context or tiny new stock movement.');
+    await closeHistory();
+    historyButton.click();
+    await waitFor(() => !lastHistoryRequest().inv_id && history.rows().count() === 10,
+        'Reopening global history retained the previous item filter.');
+    await closeHistory();
+    // Viewing history remains available without inventory mutation permissions.
+    $('body').data('manage-inventory', false).data('restock-inventory', false);
+    const beforeReadOnly = h.listFetches;
+    refresh.click();
+    await waitFor(() => h.listFetches > beforeReadOnly && $('#inventory-table .btn-history').length === 3
+        && !$('#inventory-table .btn-edit, #inventory-table .btn-delete, #inventory-table .btn-restock').length,
+        'Read-only inventory viewers must retain each history action.');
+    const beforeReadOnlyHistory = historyRequests().length;
+    $('#inventory-table .btn-history[data-id="1"]').trigger('click');
+    await waitFor(() => historyRequests().length > beforeReadOnlyHistory && history.rows().count() === 3,
+        'A read-only inventory viewer could not open item history.');
+    assert(!h.errors.length && h.requests.every(request => request.method === 'GET'
+        && ['/api/Inventory/all', '/api/Inventory/history'].includes(request.path)),
+        'The browser must use only offline inventory/history GET fixtures: ' + h.errors.join('; '));
+    return 'Inventory browser checks passed: stock precision/status, safe text, global/item history, server search/paging/filter, metadata details, error/empty recovery, refresh, and read-only history access. No CRUD or external requests.';
 })()
 '@
     Write-Output (Evaluate-Js $checks)

@@ -229,6 +229,8 @@ API controllers accept `$_POST` or JSON-decoded request data, validate it, call 
 
 ### `app/api/Inventory/InventoryController.php`
 
+- `history()` returns read-only, paginated stock history for owners, staff, and cashiers. It accepts DataTables pagination/search parameters and optional `inv_id` and `movement_type` filters; pages contain at most 100 entries, newest first.
+
 - Lists inventory.
 - Adds or updates an inventory row after validating name, amount, and unit.
 - `restock($id)` accepts only POST and requires a positive finite amount.
@@ -299,6 +301,9 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - `delete()` removes ingredient links before deleting the product.
 
 ### `app/Models/Inventory.php`
+
+- Creates, adjustments, restocks, and deletions record snapshots in `inventory_history` within the same database transaction as the inventory change. Metadata edits are logged even if quantity is unchanged; no-op saves are omitted.
+- `InventoryHistory` stores item names, units, before/change/after quantities, minimum-stock changes, the staff member, and an optional sale reference. Completed POS sales record the combined ingredient deduction once per ingredient. Failed writes and repeated checkout requests do not create extra entries.
 
 - Lists inventory and finds one item.
 - Adds or updates name, amount, and unit.
@@ -399,6 +404,8 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Includes category, price, and dynamic ingredient fields.
 
 ### `app/views/Inventory/index.php`
+
+- Inventory history opens a searchable table for all items or one selected item, with action filters and refresh. Deleted items remain visible in the global history through saved snapshots.
 
 - Defines the inventory table.
 - Provides add/edit and restock modals.
@@ -596,3 +603,11 @@ POS cart or kiosk order -> `/api/POS/checkout` -> locked product/ingredient rows
 Loyalty page -> POST `/api/Loyalty/redeem` -> ten-point deduction -> issued `GC-` code -> POS Retrieve -> choose one available coffee -> zero-value checkout -> inventory deduction and used-code marker -> receipt. The customer uses the exact issued code; it is not a kiosk order reference.
 
 Before deploying this reward checkout flow, apply `php scripts/migrate.php 036_loyalty_reward_use.sql` with the PostgreSQL PDO extension enabled. This adds nullable `used_sale_id` and `used_at` columns to existing redemptions without replacing issued codes. Focused checks are `php tests/loyalty_rewards.php`, `php tests/loyalty_checkout.php`, and `powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-pos.ps1`.
+
+### Inventory history
+
+Inventory -> Inventory history (all items), or an item's history button -> GET `/api/Inventory/history` -> searchable, paginated movement snapshots. Entries show the action, quantity before and after, signed change, date and time in Asia/Manila, staff member, and sale ID for POS usage. Name, unit, and minimum-stock edits retain their previous values. History remains available after the item is deleted.
+
+Apply `php scripts/migrate.php 038_inventory_history.sql` with the PostgreSQL PDO extension enabled before deploying this feature. The migration creates the history table and indexes without changing current stock. History records new application changes from that point; older movements were not recorded and cannot be reconstructed. Direct SQL changes outside the application are not logged.
+
+Focused checks: `php tests/inventory_history.php`, `php tests/inventory_history_api.php`, and `powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-inventory.ps1`. PostgreSQL checks can run using the existing isolated-schema runner, for example `php -d auto_prepend_file=tests/postgres.php tests/inventory_history.php`.

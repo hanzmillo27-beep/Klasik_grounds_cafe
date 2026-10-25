@@ -395,14 +395,16 @@ class POS extends Model
                 }
             }
             ksort($demand);
+            $inventoryBefore = [];
             foreach ($demand as $inventoryId => $required) {
-                $stmt = $this->db->prepare('SELECT inv_name, amount, unit FROM inventory WHERE inv_id = ?' . $this->lockClause());
+                $stmt = $this->db->prepare('SELECT inv_name, amount, unit, min_stock FROM inventory WHERE inv_id = ?' . $this->lockClause());
                 $stmt->execute([$inventoryId]);
                 $inventory = $stmt->fetch();
                 if (!$inventory || !Inventory::validQuantity($inventory->amount)) throw new \Exception('Invalid inventory item in product recipe.');
                 if ((int) round((float) $inventory->amount * 1000) < $required) {
                     throw new \Exception('Insufficient inventory for ' . $inventory->inv_name . '.');
                 }
+                $inventoryBefore[$inventoryId] = $inventory;
             }
             $customerName = trim($data['customer_name'] ?? '');
 
@@ -480,6 +482,14 @@ class POS extends Model
                 $required = number_format($requiredUnits / 1000, 3, '.', '');
                 $deductInventory->execute([$required, $inventoryId, $required]);
                 if ($deductInventory->rowCount() !== 1) throw new \Exception('Inventory changed during checkout. Please try again.');
+                $before = $inventoryBefore[$inventoryId];
+                $beforeUnits = (int) round((float) $before->amount * 1000);
+                (new InventoryHistory($this->db))->record([
+                    'inv_id' => $inventoryId, 'inv_name' => $before->inv_name, 'unit' => $before->unit,
+                    'movement_type' => 'sale', 'amount_before' => $beforeUnits / 1000,
+                    'quantity_change' => -$requiredUnits / 1000, 'amount_after' => ($beforeUnits - $requiredUnits) / 1000,
+                    'min_stock' => $before->min_stock, 'sale_id' => $saleId,
+                ]);
             }
             if ($rewardCode !== null) {
                 $stmt = $this->db->prepare('UPDATE loyalty_redemptions

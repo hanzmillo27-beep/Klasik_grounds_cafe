@@ -108,6 +108,13 @@ try {
         && (int) $db->query('SELECT COUNT(*) FROM sale_items')->fetchColumn() === 1
         && (float) $db->query('SELECT amount FROM inventory WHERE inv_id = 1')->fetchColumn() === 0.0,
         'Concurrent checkouts must commit one sale, reject the other, and never oversell stock.');
+    $movements = $db->query("SELECT * FROM inventory_history WHERE movement_type = 'sale'")->fetchAll();
+    check(count($movements) === 1 && (int) $movements[0]->inv_id === 1
+        && (float) $movements[0]->amount_before === 1.0
+        && (float) $movements[0]->quantity_change === -1.0
+        && (float) $movements[0]->amount_after === 0.0
+        && (int) $movements[0]->sale_id === (int) $db->query('SELECT sale_id FROM sales')->fetchColumn(),
+        'Concurrent checkouts must record exactly one sale movement with the committed stock change and sale reference.');
 } finally {
     // Finish every child before the PostgreSQL runner drops the isolated schema.
     foreach ($workers as $worker) {
@@ -117,4 +124,4 @@ try {
         proc_close($worker['process']);
     }
 }
-echo "FR-028 concurrency passed: two PostgreSQL checkout workers, one sale and one stock rejection.\n";
+echo "FR-028 concurrency passed: two PostgreSQL checkout workers, one sale and movement, and one stock rejection.\n";
