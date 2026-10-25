@@ -2,6 +2,7 @@ $(document).ready(function () {
 
     let table;
     let inventory = [];
+    const deletingProducts = new Set();
 
     function escapeHtml(value) {
         return $('<div>').text(value ?? '').html();
@@ -137,16 +138,18 @@ $(document).ready(function () {
 
                     render: function (data) {
                         if (!$('body').data('manage-products')) return '';
+                        const id = Number(data.product_id);
+                        const disabled = deletingProducts.has(id) ? 'disabled' : '';
                         return `
                             <button type="button" class="btn btn-sm btn-outline-secondary btn-availability"
                                 title="Change the availability setting. Ingredient stock is checked automatically."
-                                data-id="${data.product_id}" data-available="${data.is_available ? 0 : 1}">
+                                data-id="${id}" data-available="${data.is_available ? 0 : 1}" ${disabled}>
                                 ${data.is_available ? 'Mark unavailable' : 'Mark available'}
                             </button>
                             <button
                                 type="button"
                                 class="btn btn-sm btn-primary btn-edit"
-                                data-id="${data.product_id}"
+                                data-id="${id}" ${disabled}
                             >
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -154,10 +157,13 @@ $(document).ready(function () {
                             <button
                                 type="button"
                                 class="btn btn-sm btn-secondary btn-status"
-                                data-id="${data.product_id}"
+                                data-id="${id}" ${disabled}
                                 data-active="${data.is_active ? 0 : 1}"
                             >
                                 ${data.is_active ? 'Deactivate' : 'Reactivate'}
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger btn-delete" data-id="${id}" ${disabled}>
+                                <i class="fas fa-trash" aria-hidden="true"></i> Delete
                             </button>
                         `;
                     }
@@ -425,6 +431,7 @@ $(document).ready(function () {
         function () {
 
             let id = $(this).data('id');
+            if (deletingProducts.has(Number(id))) return;
 
             $.ajax({
 
@@ -508,6 +515,7 @@ $(document).ready(function () {
 
     $(document).on('click', '.btn-status', function () {
         const id = $(this).data('id');
+        if (deletingProducts.has(Number(id))) return;
         const active = $(this).data('active');
         Swal.fire({title: active ? 'Reactivate product?' : 'Deactivate product?',
             text: 'Existing recipes and transaction records will be retained.',
@@ -524,6 +532,7 @@ $(document).ready(function () {
         });
     });
     $(document).on('click', '.btn-availability', function () {
+        if (deletingProducts.has(Number($(this).data('id')))) return;
         $.ajax({url: `${base_url}/api/Products/availability/${$(this).data('id')}`, type: 'POST',
             data: {is_available: $(this).data('available')}, dataType: 'json',
             success: function (response) {
@@ -531,6 +540,41 @@ $(document).ready(function () {
                 if (response.status === 'success') table.ajax.reload(null, false);
             }, error: handleAjaxError
         });
+    });
+
+    function updateProductControls(id) {
+        $('#products-table button[data-id]').filter(function () {
+            return Number($(this).data('id')) === id;
+        }).prop('disabled', deletingProducts.has(id));
+    }
+    $(document).on('click', '.btn-delete', async function () {
+        if (!$('body').data('manage-products')) return;
+        const id = Number($(this).data('id'));
+        if (!Number.isInteger(id) || id <= 0 || deletingProducts.has(id)) return;
+        const product = table.rows().data().toArray().find(item => Number(item.product_id) === id);
+        if (!product) return;
+
+        deletingProducts.add(id);
+        updateProductControls(id);
+        try {
+            const result = await Swal.fire({
+                title: 'Delete product?',
+                text: 'Remove "' + product.product_name + '" from the catalog? Existing sales history will be kept.',
+                icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete product',
+                cancelButtonText: 'Keep product', confirmButtonColor: '#b42318', focusCancel: true
+            });
+            if (!result || !result.isConfirmed) return;
+            const response = await $.ajax({url: `${base_url}/api/Products/delete/${id}`, type: 'POST', dataType: 'json'});
+            if (response && response.status === 'success') msgBox('success', response.message || 'Product deleted.');
+            else msgBox('error', response && response.message || 'Unable to delete product.');
+            table.ajax.reload(null, false);
+        } catch (error) {
+            handleAjaxError(error);
+            table.ajax.reload(null, false);
+        } finally {
+            deletingProducts.delete(id);
+            updateProductControls(id);
+        }
     });
 
     $('#products-form').on(

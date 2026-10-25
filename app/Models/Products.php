@@ -300,7 +300,48 @@ class Products extends Model
 
     public function delete($id): bool
     {
-        return $this->setActive($id, false);
+        if (!is_string($id) && !is_int($id)) return false;
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) return false;
+        $started = false;
+        try {
+            $this->db->beginTransaction();
+            $started = true;
+            $stmt = $this->db->prepare('SELECT product_id, product_name FROM products WHERE product_id = ?' . $this->lockClause());
+            $stmt->execute([$id]);
+            $product = $stmt->fetch();
+            if (!$product) {
+                $this->db->rollBack();
+                return false;
+            }
+            // These checks must not lock orders or rewards: checkout locks them before products.
+            $stmt = $this->db->prepare('SELECT 1 FROM kiosk_order_items item
+                INNER JOIN kiosk_orders orders ON orders.kiosk_order_id = item.kiosk_order_id
+                WHERE item.product_id = ? AND orders.status IN (\'pending\', \'claimed\')
+                    AND orders.sale_id IS NULL LIMIT 1');
+            $stmt->execute([$id]);
+            if ($stmt->fetchColumn() !== false) {
+                throw new \DomainException('This product is in an open kiosk order. Complete or delete that order first.');
+            }
+            $stmt = $this->db->prepare('SELECT 1 FROM loyalty_redemptions
+                WHERE product_id = ? AND used_sale_id IS NULL AND used_at IS NULL LIMIT 1');
+            $stmt->execute([$id]);
+            if ($stmt->fetchColumn() !== false) {
+                throw new \DomainException('This product has an unused reward code. Fulfill that reward before deleting it.');
+            }
+            $stmt = $this->db->prepare('UPDATE sale_items SET product_name = ? WHERE product_id = ? AND product_name IS NULL');
+            $stmt->execute([$product->product_name, $id]);
+            $stmt = $this->db->prepare('DELETE FROM product_ingredients WHERE product_id = ?');
+            $stmt->execute([$id]);
+            $stmt = $this->db->prepare('DELETE FROM products WHERE product_id = ?');
+            $stmt->execute([$id]);
+            if ($stmt->rowCount() !== 1) throw new \RuntimeException('Unable to delete product.');
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $error) {
+            if ($started && $this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
     }
 
     // Product queries use alias p. An empty recipe represents an untracked product.

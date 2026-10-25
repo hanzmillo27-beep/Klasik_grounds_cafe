@@ -224,7 +224,7 @@ API controllers accept `$_POST` or JSON-decoded request data, validate it, call 
 - `inventory()` returns inventory choices used for ingredient autocomplete.
 - `add()` validates name, category, and price, optionally uploads `product_image`, then calls `Products::save()`.
 - `edit($id)` returns one product for GET and updates it for POST.
-- `delete($id)` removes the product and its ingredient rows.
+- `delete($id)` accepts owner-only POST requests and removes the product and its ingredient rows. Invalid/missing products return 400/404; open kiosk orders or unused item-bound rewards block deletion with 409. Completed sales and order snapshots remain available.
 - The hidden `product_id` in the product form is important: without it, editing is interpreted as inserting a new product.
 
 ### `app/api/Inventory/InventoryController.php`
@@ -300,7 +300,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - `categories()` and `inventory()` provide form choices.
 - `save()` runs in a transaction, updates or inserts the product, replaces all ingredient rows, and resolves ingredient names to inventory IDs.
 - Product updates use `COALESCE(?, product_image)` so an edit without a new upload retains the existing photo.
-- `delete()` removes ingredient links before deleting the product.
+- `delete()` locks the product, checks for open kiosk orders and unused item-bound rewards, then removes ingredient links and the product in one transaction. It does not change inventory quantities or delete historical sales. Nullable sales/order product references become NULL while saved names, quantities and prices remain intact. Missing legacy sale-item names are saved from the current product name before removal, preserving the label already shown on receipts. Deactivate/Reactivate remains a separate reversible action.
 
 ### `app/Models/Inventory.php`
 
@@ -465,6 +465,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 
 - Loads categories and inventory autocomplete data.
 - Creates the products DataTable and displays image thumbnails.
+- Provides owner-only Delete with confirmation and a per-product busy guard. Success and failure refresh the current table page; cancellation sends no delete request. Deactivate/Reactivate remains available separately.
 - Adds/removes ingredient rows and searches inventory names.
 - Loads an existing product into the edit form.
 - Shows a selected or current image preview.
@@ -592,6 +593,10 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 ### Product update
 
 Products page -> edit API GET -> hidden `product_id` is populated -> `FormData` POST -> optional Supabase image upload -> `Products::save()` update branch -> ingredients replaced -> table reload.
+
+### Product deletion
+
+Owner Products page -> Delete -> confirmation -> POST `/api/Products/delete/{id}` -> locked product and reference checks -> recipe/catalog removal -> refreshed product list. Products in pending/claimed kiosk orders or unused item rewards must be fulfilled or resolved first. Existing sales and completed/cancelled order snapshots remain available, and stock quantities are unchanged. Focused checks: `php tests/product_delete.php` and `powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-products.ps1`.
 
 ### Customer order
 

@@ -63,14 +63,8 @@ check(($result['status'] ?? '') === 'error' && http_response_code() === 405
     && productActive($products->findByID(1)), 'GET must not deactivate a product.');
 $result = productStatusRequest('1', '0', 'delete', 'GET');
 check(($result['status'] ?? '') === 'error' && productActive($products->findByID(1)),
-    'The legacy delete route must reject GET without changing the product.');
-
-$result = productStatusRequest('1', '0', 'delete');
-check(($result['status'] ?? '') === 'success' && !productActive($products->findByID(1)),
-    'The legacy delete route must deactivate instead of deleting.');
+    'The delete route must reject GET without changing the product.');
 check($products->setActive(1, true) && productActive($products->findByID(1)), 'Model reactivation failed.');
-check($products->delete(1) && $products->findByID(1) && !productActive($products->findByID(1)),
-    'The model delete alias must retain a deactivated product.');
 check(!$products->setActive(99999, false), 'Status changes to nonexistent products must fail.');
 check((int) $db->query('SELECT COUNT(*) FROM products')->fetchColumn() === 1
     && (int) $db->query('SELECT COUNT(*) FROM sales')->fetchColumn() === 1

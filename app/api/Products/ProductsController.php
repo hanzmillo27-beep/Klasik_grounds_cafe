@@ -188,10 +188,33 @@ class ProductsController extends BaseController
         $this->json(['status'=>'success','message'=>$available ? 'Product marked available.' : 'Product marked unavailable.']);
     }
 
-    public function delete($id)
+    public function delete($id = null)
     {
-        $_POST['is_active'] = '0';
-        $this->status($id);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to delete a product.']);
+        }
+        $id = is_string($id) || is_int($id) ? filter_var($id, FILTER_VALIDATE_INT) : false;
+        if (!$id || $id < 1) {
+            http_response_code(400);
+            $this->json(['status'=>'error','message'=>'Choose a valid product.']);
+        }
+        try {
+            $deleted = $this->Products->delete($id);
+        } catch (\DomainException $error) {
+            http_response_code(409);
+            $this->json(['status'=>'error','message'=>$error->getMessage()]);
+            return;
+        } catch (\Throwable $error) {
+            http_response_code(500);
+            $this->json(['status'=>'error','message'=>'Unable to delete product. Please try again.']);
+            return;
+        }
+        if (!$deleted) {
+            http_response_code(404);
+            $this->json(['status'=>'error','message'=>'Product not found.']);
+        }
+        $this->json(['status'=>'success','message'=>'Product deleted successfully.']);
     }
     private function attachUploadedImage(array &$data): void
     {

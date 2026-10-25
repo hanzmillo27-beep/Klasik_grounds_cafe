@@ -9,7 +9,7 @@ $db->exec('CREATE TABLE sales (
 )');
 $db->exec('CREATE TABLE sale_items (
     sale_item_id ' . $identity . ', sale_id INTEGER NOT NULL REFERENCES sales(sale_id),
-    product_id INTEGER REFERENCES products(product_id), product_name VARCHAR(150),
+    product_id INTEGER REFERENCES products(product_id) ON DELETE SET NULL, product_name VARCHAR(150),
     quantity INTEGER NOT NULL, unit_price NUMERIC(10,2) NOT NULL, subtotal NUMERIC(10,2) NOT NULL
 )');
 $db->exec('CREATE TABLE kiosk_orders (
@@ -21,7 +21,7 @@ $db->exec('CREATE TABLE kiosk_orders (
 )');
 $db->exec('CREATE TABLE kiosk_order_items (
     kiosk_item_id ' . $identity . ', kiosk_order_id INTEGER NOT NULL REFERENCES kiosk_orders(kiosk_order_id),
-    product_id INTEGER NOT NULL REFERENCES products(product_id), product_name VARCHAR(150) NOT NULL,
+    product_id INTEGER REFERENCES products(product_id) ON DELETE SET NULL, product_name VARCHAR(150) NOT NULL,
     quantity INTEGER NOT NULL, unit_price NUMERIC(10,2) NOT NULL, subtotal NUMERIC(10,2) NOT NULL
 )');
 $db->exec('CREATE TABLE loyal (
