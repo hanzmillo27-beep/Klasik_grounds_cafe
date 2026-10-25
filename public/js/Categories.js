@@ -71,7 +71,7 @@ const CategoriesModule = (function () {
 
         const url = id
             ? `${base_url}/api/Categories/edit/${id}`
-            : `${base_url}/api/Categories/add`;
+            : `${base_url}/api/Categories/create`;
 
         $.ajax({
             url: url,

@@ -262,7 +262,7 @@ $(document).ready(function () {
 
     $(document).on(
         'click',
-        '.btn-edit',
+        '.btn-update',
         function () {
 
             let id = $(this).data('id');
