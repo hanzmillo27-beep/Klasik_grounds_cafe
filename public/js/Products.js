@@ -564,7 +564,7 @@ $(document).ready(function () {
                 cancelButtonText: 'Keep product', confirmButtonColor: '#b42318', focusCancel: true
             });
             if (!result || !result.isConfirmed) return;
-            const response = await $.ajax({url: `${base_url}/api/Products/delete/${id}`, type: 'GET', dataType: 'json'});
+            const response = await $.ajax({url: `${base_url}/api/Products/delete/${id}`, type: 'POST', dataType: 'json'});
             if (response && response.status === 'success') msgBox('success', response.message || 'Product deleted.');
             else msgBox('error', response && response.message || 'Unable to delete product.');
             table.ajax.reload(null, false);
