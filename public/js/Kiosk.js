@@ -191,7 +191,7 @@ $(document).ready(function () {
 
         item.quantity--;
 
-        if (item.quantity <= 0) {
+        if (item.quantity < 0) {
             cart = cart.filter(x => Number(x.product_id) !== id);
         }
 
