@@ -425,7 +425,7 @@ $(document).ready(function () {
             const filtered = products.filter((product) =>
                 product.product_name
                     .toLowerCase()
-                    .startsWith(search)
+                    .includes(search)
             );
 
             renderProducts(filtered);

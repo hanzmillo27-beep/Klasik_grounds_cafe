@@ -182,7 +182,7 @@ $(document).ready(function () {
                     data: 'unit', render: $.fn.dataTable.render.text()
                 },
                 {data: 'min_stock', render: function (value) { return Number(value).toLocaleString(undefined, {maximumFractionDigits: 3}); }},
-                {data: 'is_low', render: function (low) { return !low ? '<span class="badge badge-warning">Low stock</span>' : '<span class="badge badge-success">In stock</span>'; }},
+                {data: 'is_low', render: function (low) { return low ? '<span class="badge badge-warning">Low stock</span>' : '<span class="badge badge-success">In stock</span>'; }},
 
                 {
                     data: null,
