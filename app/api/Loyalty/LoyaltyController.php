@@ -43,7 +43,7 @@ class LoyaltyController extends BaseController
             $result = $this->Loyalty->redeem($this->customerId());
             $this->json([
                 'status' => 'success',
-                'message' => 'Free coffee redeemed. Show the reward code to the cashier.',
+                'message' => 'Reward issued. Show this code to the cashier to choose your free coffee.',
                 'data' => $result
             ]);
         } catch (\Throwable $e) {

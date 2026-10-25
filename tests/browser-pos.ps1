@@ -5,8 +5,8 @@ param(
 )
 
 # Offline browser regression for the real POS view and JavaScript.
-# All AJAX is stubbed. Only the final receipt test permits one offline checkout;
-# all earlier checkout attempts and unrecognized requests fail immediately.
+# All AJAX is stubbed. Checkout is permitted only by the paid/free receipt fixtures;
+# all other checkout attempts and unrecognized requests fail immediately.
 # this script never loads app/config/init.php or connects to an application DB.
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -59,6 +59,7 @@ window.__posHarness = {
     errors: [], requests: [], messages: [], allowCheckout: false,
     queueFetches: 0, queueResponses: [], intervals: [],
     confirmationResponses: [], dialogs: [], deleteResponses: [], cancelledOrders: [],
+    rewardCode: 'GC-0BADC0DE', allowRewardCheckout: false,
     queueOrders: [
         {kiosk_order_id: 42, reference_code: 'KG-BROWSER', customer_name: 'Kiosk customer',
             total_amount: 391, created_at: '2026-10-19 10:00:00', item_count: 3,
@@ -99,13 +100,17 @@ window.addEventListener('unhandledrejection', function (event) {
     __posHarness.errors.push(String(event.reason));
 });
 window.msgBox = function (status, message) { __posHarness.messages.push({status: status, message: message}); };
-window.handleAjaxError = function () { __posHarness.errors.push('Unexpected AJAX failure.'); };
+window.handleAjaxError = function (xhr) {
+    if (xhr && xhr.fixtureExpectedError) {
+        __posHarness.messages.push({status: 'error', message: xhr.responseJSON.message});
+    } else __posHarness.errors.push('Unexpected AJAX failure.');
+};
 // Keep confirmations deterministic while exercising both cancellation and confirmation.
 window.Swal = {fire: function (options) {
     __posHarness.dialogs.push(options);
     const fixture = __posHarness.confirmationResponses.shift() || {isConfirmed: true};
     return new Promise(resolve => setTimeout(function () {
-        resolve({isConfirmed: fixture.isConfirmed !== false});
+        resolve({isConfirmed: fixture.isConfirmed !== false, value: fixture.value});
     }, fixture.delay || 0));
 }};
 const nativeSetInterval = window.setInterval;
@@ -122,6 +127,63 @@ $.ajax = function (options) {
     }
     if (path === '/api/POS/products' || path === '/api/Kiosk/products') response = {data: __posHarness.products};
     else if (path === '/api/POS/transactions') response = {data: []};
+    else if (path === '/api/Loyalty/summary') {
+        requireFixture((options.type || 'GET') === 'GET', 'Loyalty summary must use GET.');
+        const issued = localStorage.getItem('__fixture_loyalty_issued') === __posHarness.rewardCode;
+        const used = localStorage.getItem('__fixture_reward_used') === __posHarness.rewardCode;
+        const activity = [
+            {description: 'Free coffee reward', activity_date: '2026-10-18 09:00:00', points: -10,
+                reward_code: 'GC-DEADC0DE', status: 'used', used_sale_id: 55, used_at: '2026-10-18 10:00:00'},
+            {description: '<img src=x onerror="window.__loyaltyXss=true">', activity_date: '2026-10-17 09:00:00', points: 1,
+                reward_code: null, status: null, used_sale_id: null, used_at: null}
+        ];
+        if (issued) activity.unshift({description: 'Free coffee reward', activity_date: '2026-10-25 09:00:00', points: -10,
+            reward_code: __posHarness.rewardCode, status: used ? 'used' : 'available',
+            used_sale_id: used ? 78 : null, used_at: used ? '2026-10-25 10:00:00' : null});
+        response = {status: 'success', data: {points: issued ? 0 : 10, rewards_available: issued ? 0 : 1, activity: activity}};
+    } else if (path === '/api/Loyalty/redeem') {
+        requireFixture(options.type === 'POST' && !localStorage.getItem('__fixture_loyalty_issued'),
+            'A reward must be issued once through POST.');
+        response = {status: 'success', message: 'Reward issued. Show the code to the cashier.',
+            data: {reward_code: __posHarness.rewardCode, points: 0}};
+        delay = 80;
+        beforeResolve = function () { localStorage.setItem('__fixture_loyalty_issued', __posHarness.rewardCode); };
+    } else if (/^\/api\/POS\/reward\/GC-(0BADC0DE|DEADC0DE|BADBAD00)$/.test(path)) {
+        requireFixture((options.type || 'GET') === 'GET', 'Reward lookup must use GET without consuming the code.');
+        const code = path.split('/').pop();
+        if (code !== __posHarness.rewardCode || localStorage.getItem('__fixture_reward_used') === code) {
+            const used = code === 'GC-DEADC0DE' || localStorage.getItem('__fixture_reward_used') === code;
+            response = {status: 'error'};
+            rejection = {status: used ? 409 : 404, fixtureExpectedError: true,
+                responseJSON: {status: 'error', message: used ? 'This free coffee reward has already been used.' : 'Free coffee reward code not found.'}};
+        } else response = {status: 'success', data: {reward_code: code, customer_name: 'Loyalty customer',
+            points_spent: 10, created_at: '2026-10-25 09:00:00', products: __posHarness.products.filter(product => [1, 2, 6].includes(product.product_id))}};
+        delay = 40;
+    } else if (path === '/api/POS/checkout' && __posHarness.allowRewardCheckout) {
+        __posHarness.allowRewardCheckout = false;
+        requireFixture(options.type === 'POST' && options.data instanceof FormData, 'Reward checkout must POST FormData.');
+        const data = options.data;
+        requireFixture(data.get('reward_code') === __posHarness.rewardCode && !data.has('kiosk_order_id')
+            && data.get('customer_name') === 'Loyalty customer', 'Reward checkout lost its exact code/customer or retained kiosk context.');
+        requireFixture(Number(data.get('amount_paid')) === 0 && Number(data.get('expected_total')) === 0,
+            'A free coffee checkout must have zero payment and total.');
+        requireFixture(data.get('checkout_key') === __posHarness.expectedRewardKey,
+            'Reward checkout lost its stable checkout key.');
+        const items = JSON.parse(data.get('items'));
+        requireFixture(items.length === 1 && Number(items[0].product_id) === 2 && Number(items[0].quantity) === 1
+            && Object.keys(items[0]).sort().join(',') === 'product_id,quantity', 'A reward must check out exactly one canonical selected coffee.');
+        response = {status: 'success', message: 'Free coffee served.', sale_id: 78,
+            total_amount: 0, amount_paid: 0, change_amount: 0, loyalty_point_earned: false};
+        delay = 80;
+        beforeResolve = function () {
+            localStorage.setItem('__fixture_reward_used', __posHarness.rewardCode);
+            __posHarness.rewardCheckoutCaptured = true;
+        };
+    } else if (path === '/api/POS/transaction/78' && __posHarness.rewardCheckoutCaptured) {
+        response = {status: 'success', data: {sale_id: 78, customer_name: 'Loyalty customer', user_name: 'Browser cashier',
+            sale_date: '2026-10-25 10:00:00', total_amount: 0, amount_paid: 0, change_amount: 0,
+            items: [{product_id: 2, product_name: 'Current Latte', quantity: 1, unit_price: 0, subtotal: 0}]}};
+    }
     else if (path === '/api/POS/kioskOrders') {
         requireFixture((options.type || 'GET') === 'GET', 'The kiosk queue must use GET.');
         __posHarness.queueFetches++;
@@ -215,6 +277,14 @@ $kioskView = (& $PhpPath -f $kioskRendererPath | Out-String)
 if ($LASTEXITCODE -ne 0) { throw 'Rendering the offline kiosk view failed.' }
 $kioskUri = Asset-Uri 'public/js/Kiosk.js'
 Set-Content -LiteralPath $kioskHtmlPath -Encoding UTF8 -Value ($html.Replace($renderedView, $kioskView).Replace($posUri, $kioskUri))
+$loyaltyRendererPath = Join-Path $artifactDirectory 'render-loyalty.php'
+$loyaltyHtmlPath = Join-Path $artifactDirectory 'loyalty.html'
+$loyaltyViewPath = (Join-Path $projectRoot 'app/views/Loyalty/index.php').Replace('\', '/').Replace("'", "\'")
+[IO.File]::WriteAllText($loyaltyRendererPath, ("<?php require '" + $loyaltyViewPath + "';"), [Text.UTF8Encoding]::new($false))
+$loyaltyView = (& $PhpPath -f $loyaltyRendererPath | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'Rendering the offline loyalty view failed.' }
+$loyaltyUri = Asset-Uri 'public/js/Loyalty.js'
+Set-Content -LiteralPath $loyaltyHtmlPath -Encoding UTF8 -Value ($html.Replace($renderedView, $loyaltyView).Replace($posUri, $loyaltyUri))
 
 $socket = New-Object Net.WebSockets.ClientWebSocket
 $browserProcess = $null
@@ -262,6 +332,19 @@ function Wait-PosReady([string]$previousGeneration = '') {
         Start-Sleep -Milliseconds 100
     }
     throw 'The offline POS page did not become ready.'
+}
+function Wait-LoyaltyReady([string]$previousGeneration = '') {
+    for ($attempt = 0; $attempt -lt 100; $attempt++) {
+        try {
+            $state = Evaluate-Js '(() => { const h = window.__posHarness; return h ? {generation: h.generation, ready: document.readyState === "complete" && /^\d+$/.test($("#loyalty-points").text()) && $("#loyalty-activity tr").length >= 2, errors: h.errors} : null; })()'
+            if ($state -and $state.errors.Count) { throw ('Loyalty browser errors: ' + ($state.errors -join '; ')) }
+            if ($state -and $state.ready -and $state.generation -ne $previousGeneration) { return $state.generation }
+        } catch {
+            if ($_.Exception.Message -like 'Loyalty browser errors:*' -or $attempt -eq 99) { throw }
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw 'The offline loyalty page did not become ready.'
 }
 
 $assertions = @'
@@ -771,6 +854,156 @@ assertOffline(1);
 return 'Delete confirmation/cancel, busy and duplicate guards, pending-order preservation, error recovery, and successful active-order cart/context cleanup passed.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $deletePhase + '})()'))
+    $null = Send-Cdp 'Page.navigate' @{url = ([uri]$loyaltyHtmlPath).AbsoluteUri}
+    $loyaltyGeneration = Wait-LoyaltyReady
+    Write-Output (Evaluate-Js ('(async () => {' + $assertions + @'
+assert($('#loyalty-points').text() === '10' && !$('#loyalty-redeem').prop('disabled'), 'Ten points must allow issuing one reward code.');
+assert($('#loyalty-activity').text().includes('Used') && !$('#loyalty-activity img').length && !window.__loyaltyXss,
+    'Loyalty activity must show used status and escape descriptions.');
+assert($('#loyalty-reward-code').hasClass('d-none'), 'A used reward must not appear in the ready-code banner.');
+click('#loyalty-redeem');
+$('#loyalty-redeem').prop('disabled', false).trigger('click');
+assert(h.requests.filter(request => request.path === '/api/Loyalty/redeem').length === 1, 'A pending reward issue allowed a duplicate POST.');
+await waitFor(() => $('#loyalty-reward-code strong').text() === h.rewardCode
+    && $('#loyalty-activity').text().includes('Ready for cashier'), 'Issuing a reward did not display its exact ready code.');
+assert($('#loyalty-points').text() === '0' && $('#loyalty-redeem').prop('disabled'), 'Issuing a code must update the points and disable an unaffordable next reward.');
+assert($('#loyalty-reward-code').text().includes('Reward issued')
+    && h.messages.some(message => message.status === 'success' && message.message.includes('Reward issued')), 'Reward issue must explain that the customer still needs the cashier.');
+localStorage.setItem('__fixture_shown_reward_code', $('#loyalty-reward-code strong').text());
+assertOffline();
+return 'Loyalty issues one exact GC code, distinguishes ready/used rewards, safely renders activity, and prevents duplicate issuance.';
+'@ + '})()'))
+    $null = Send-Cdp 'Page.reload' @{ignoreCache = $true}
+    $null = Wait-LoyaltyReady $loyaltyGeneration
+    Write-Output (Evaluate-Js ('(() => {' + $assertions + @'
+assert(!$('#loyalty-reward-code').hasClass('d-none')
+    && $('#loyalty-reward-code strong').text() === localStorage.getItem('__fixture_shown_reward_code'),
+    'Reloading Loyalty must restore the same unused reward code for the cashier.');
+assert($('#loyalty-activity tr').filter(function () { return this.textContent.includes(h.rewardCode); }).text().includes('Ready for cashier'),
+    'The restored reward activity must identify the code as ready.');
+return 'Unused GC code remains available after reloading Loyalty.';
+'@ + '})()'))
+    $null = Send-Cdp 'Page.navigate' @{url = ([uri]$htmlPath).AbsoluteUri}
+    $rewardGeneration = Wait-PosReady
+    $rewardPhase = @'
+const code = localStorage.getItem('__fixture_shown_reward_code');
+assert(code === h.rewardCode, 'POS must receive the exact GC code shown by Loyalty.');
+function rewardLookups() { return h.requests.filter(request => request.path.includes('/api/POS/reward/')).length; }
+async function retrieveReward(value, selection) {
+    const previous = rewardLookups();
+    if (selection) h.confirmationResponses.push(selection);
+    $('#kiosk-reference-input').val(value);
+    click('#btn-load-kiosk-order');
+    await waitFor(() => rewardLookups() === previous + 1 && !$('#btn-load-kiosk-order').prop('disabled'), 'Reward lookup did not finish.');
+}
+for (const invalidCode of ['GC-BADBAD00', 'GC-DEADC0DE']) {
+    const messages = h.messages.length;
+    await retrieveReward(invalidCode);
+    assertCart([], 0);
+    assert(!localStorage.getItem('pos_reward_code') && h.messages.slice(messages).some(message => message.status === 'error'),
+        'An unknown or used code must show an error without loading a reward cart.');
+}
+await retrieveReward(code, {isConfirmed: false});
+assertCart([], 0);
+assert(!localStorage.getItem('pos_reward_code') && !localStorage.getItem('__fixture_reward_used'), 'Cancelling coffee selection must leave the reward unused.');
+await retrieveReward(' ' + code.toLowerCase() + ' ', {value: '2'});
+const selection = h.dialogs.find(dialog => dialog.title === 'Choose your free coffee');
+assert(selection && selection.input === 'select' && selection.confirmButtonText === 'Load free coffee'
+    && selection.inputOptions['1'] && selection.inputOptions['2'] && !selection.inputOptions['6'],
+    'Coffee selection must offer available eligible coffees and exclude the stock-short product.');
+assertCart([[2, 1, 0]], 0);
+assert(localStorage.getItem('pos_reward_code') === code && $('#customer_name').val() === 'Loyalty customer', 'Loading a reward lost the exact code or customer.');
+assert(!$('#pos-reward-summary').hasClass('d-none') && $('#pos-reward-summary').text().includes(code), 'The loaded reward code must be visible in Current Sale.');
+assert($('#amount_paid').val() === '0.00' && $('#amount_paid').prop('readOnly'), 'A free reward must show zero read-only payment.');
+click('.btn-add-product[data-id="3"]');
+$('.btn-increase[data-id="2"]').prop('disabled', false).trigger('click');
+assertCart([[2, 1, 0]], 0);
+const beforeRewardClaims = claimCount();
+$(queueButton(42)).prop('disabled', false).trigger('click');
+assert(claimCount() === beforeRewardClaims, 'A kiosk claim replaced the standalone reward coffee.');
+h.products.find(product => product.product_id === 2).can_order = false;
+h.products.find(product => product.product_id === 2).stock_available = false;
+$(window).triggerHandler('focus');
+await waitFor(() => cart()[0].unavailable, 'Reward coffee stock changes were not checked on refresh.');
+click('#btnCheckout');
+assertOffline();
+assertCart([[2, 1, 0]], 0);
+h.products.find(product => product.product_id === 2).can_order = true;
+h.products.find(product => product.product_id === 2).stock_available = true;
+$(window).triggerHandler('focus');
+await waitFor(() => !cart()[0].unavailable, 'Restocking did not restore the free coffee.');
+click('#btnClear');
+await waitFor(() => !localStorage.getItem('pos_reward_code') && cart().length === 0, 'New order did not clear the local reward context.');
+assert(!localStorage.getItem('__fixture_reward_used') && !$('#amount_paid').prop('readOnly'), 'Clearing a reward must leave the code unused and restore payment entry.');
+click('.btn-add-product[data-id="2"]');
+assertCart([[2, 1, 160]], 160);
+const occupiedRewardLookups = rewardLookups();
+$('#kiosk-reference-input').val(code);
+click('#btn-load-kiosk-order');
+assert(rewardLookups() === occupiedRewardLookups, 'A reward lookup replaced a nonempty paid sale.');
+assertCart([[2, 1, 160]], 160);
+click('.btn-remove[data-id="2"]');
+await retrieveReward(code, {value: '2'});
+click('.btn-remove[data-id="2"]');
+assertCart([], 0);
+assert(!localStorage.getItem('pos_reward_code') && !$('#amount_paid').prop('readOnly')
+    && !localStorage.getItem('__fixture_reward_used'), 'Removing the last reward coffee must clear only its local context.');
+click('.btn-add-product[data-id="2"]');
+assertCart([[2, 1, 160]], 160);
+click('.btn-remove[data-id="2"]');
+await retrieveReward(code, {value: '2'});
+assertCart([[2, 1, 0]], 0);
+assertOffline();
+return 'Exact loyalty code lookup/selection, unknown/used/cancel paths, standalone guards, zero pricing, stock checks, and clearing/restoring regular prices passed.';
+'@
+    Write-Output (Evaluate-Js ('(async () => {' + $assertions + $rewardPhase + '})()'))
+    $null = Send-Cdp 'Page.reload' @{ignoreCache = $true}
+    $null = Wait-PosReady $rewardGeneration
+    Write-Output (Evaluate-Js ('(async () => {' + $assertions + @'
+const code = localStorage.getItem('__fixture_shown_reward_code');
+assertCart([[2, 1, 0]], 0);
+assert(localStorage.getItem('pos_reward_code') === code && $('#amount_paid').val() === '0.00'
+    && $('#amount_paid').prop('readOnly'), 'Reload must preserve a single free coffee and its zero payment.');
+h.products.find(product => product.product_id === 2).product_price = 245;
+$(window).triggerHandler('focus');
+await waitFor(() => $('.btn-add-product[data-id="2"]').closest('.product-card').text().includes('245.00'), 'The changed coffee price did not refresh.');
+assertCart([[2, 1, 0]], 0);
+assert(!localStorage.getItem('__fixture_reward_used'), 'Lookup, reload, or price refresh consumed the reward before checkout.');
+h.expectedRewardKey = localStorage.getItem('pos_checkout_key');
+h.allowRewardCheckout = true;
+click('#btnCheckout');
+assert(localStorage.getItem('pos_reward_code') === code && !localStorage.getItem('__fixture_reward_used'),
+    'The reward must remain loaded and unused while checkout is pending.');
+await waitFor(() => h.rewardCheckoutCaptured && $('#transaction-details').text().includes('#78')
+    && !$('#btnCheckout').prop('disabled'), 'The free coffee checkout did not complete and display its receipt.');
+assertCart([], 0);
+assert(!localStorage.getItem('pos_reward_code') && localStorage.getItem('__fixture_reward_used') === code
+    && $('#pos-reward-summary').hasClass('d-none') && !$('#amount_paid').prop('readOnly'),
+    'Only successful reward checkout must consume the code and clear all local reward state.');
+const row = $('#transaction-details tbody tr');
+assert(row.length === 1 && row.text().includes('Current Latte')
+    && Array.from(row[0].querySelectorAll('td')).slice(-2).every(cell => cell.textContent.trim().endsWith('0.00')),
+    'The free coffee receipt must show one selected coffee with zero unit price and subtotal.');
+assert(localStorage.getItem('pos_checkout_key') !== h.expectedRewardKey, 'Reward checkout must start a fresh checkout key.');
+const beforeUsedMessages = h.messages.length;
+$('#kiosk-reference-input').val(code);
+click('#btn-load-kiosk-order');
+await waitFor(() => h.messages.length > beforeUsedMessages && !$('#btn-load-kiosk-order').prop('disabled'), 'Reusing a consumed reward did not finish.');
+assertCart([], 0);
+assert(h.messages.slice(beforeUsedMessages).some(message => message.status === 'error'), 'A consumed reward code must be rejected.');
+assertOffline(1);
+return 'Reward survives reload and price refresh at zero, checks out one coffee, displays a zero receipt, clears state, and rejects reuse.';
+'@ + '})()'))
+    $null = Send-Cdp 'Page.navigate' @{url = ([uri]$loyaltyHtmlPath).AbsoluteUri}
+    $null = Wait-LoyaltyReady
+    Write-Output (Evaluate-Js ('(() => {' + $assertions + @'
+const code = localStorage.getItem('__fixture_shown_reward_code');
+assert($('#loyalty-activity tr').filter(function () { return this.textContent.includes(code); }).text().includes('Used'),
+    'The completed free coffee must appear as Used in customer activity.');
+assert($('#loyalty-reward-code').hasClass('d-none'), 'A served reward must disappear from the ready-code banner.');
+assertOffline();
+return 'Customer activity marks the served coffee code Used and hides it from ready rewards.';
+'@ + '})()'))
     $null = Send-Cdp 'Page.navigate' @{url = ([uri]$kioskHtmlPath).AbsoluteUri}
     $kioskReady = $false
     for ($attempt = 0; $attempt -lt 100; $attempt++) {

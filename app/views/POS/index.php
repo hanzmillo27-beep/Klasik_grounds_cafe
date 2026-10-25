@@ -91,14 +91,14 @@
                 </div>
 
                 <div class="form-group mb-3">
-    <label for="kiosk-reference-input">Kiosk Order Reference</label>
+    <label for="kiosk-reference-input">Kiosk or Reward Reference</label>
 
     <div class="input-group">
         <input
             type="text"
             id="kiosk-reference-input"
             class="form-control"
-            placeholder="e.g. KG-7F29A1"
+            placeholder="KG-... or GC-..."
         >
 
         <div class="input-group-append">
@@ -112,6 +112,8 @@
         </div>
     </div>
 </div>
+
+                <div id="pos-reward-summary" class="alert alert-success d-none" role="status"></div>
 
                 <div
                     id="cart-list"

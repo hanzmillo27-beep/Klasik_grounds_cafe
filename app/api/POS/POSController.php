@@ -4,7 +4,9 @@ namespace Api\POS;
 
 use Core\BaseController;
 use Core\Auth;
+use Core\RewardEligibility;
 use Models\Kiosk;
+use Models\Loyalty;
 use Models\POS;
 
 class POSController extends BaseController
@@ -68,6 +70,27 @@ class POSController extends BaseController
             return;
         }
         $this->json(['status'=>'success','message'=>'Kiosk order deleted.']);
+    }
+
+    public function reward($code = null)
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use GET to retrieve a reward.']);
+        }
+        try {
+            if (!is_string($code)) throw new \InvalidArgumentException('Enter a valid reward code (GC-XXXXXXXX).');
+            $reward = (new Loyalty())->reward($code);
+            unset($reward['user_id']);
+            $reward['products'] = array_values(array_filter($this->POS->products(), function ($product) {
+                return $product->can_order && RewardEligibility::isCoffeeCategory($product->category_name);
+            }));
+        } catch (\Throwable $error) {
+            http_response_code(400);
+            $this->json(['status'=>'error','message'=>$error->getMessage()]);
+            return;
+        }
+        $this->json(['status'=>'success','data'=>$reward]);
     }
 
     public function transactions()

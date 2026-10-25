@@ -24,12 +24,14 @@ $(document).ready(function () {
         const storage = {
             cart: 'pos_cart',
             customerName: 'pos_customer_name',
-            kioskOrderId: 'pos_kiosk_order_id'
+            kioskOrderId: 'pos_kiosk_order_id',
+            rewardCode: 'pos_reward_code'
         };
 
         let products = [];
         let cart = [];
         let kioskOrderId = null;
+        let activeRewardCode = null;
         let originalKioskItems = [];
         let loadingKiosk = false;
         let checkingOut = false;
@@ -233,6 +235,8 @@ $(document).ready(function () {
         function loadSavedCart() {
             const savedKioskOrderId = localStorage.getItem(storage.kioskOrderId);
             kioskOrderId = savedKioskOrderId ? Number(savedKioskOrderId) : null;
+            const savedRewardCode = String(localStorage.getItem(storage.rewardCode) || '').trim().toUpperCase();
+            activeRewardCode = /^GC-[A-F0-9]{8}$/.test(savedRewardCode) ? savedRewardCode : null;
             try { originalKioskItems = JSON.parse(localStorage.getItem('pos_kiosk_items') || '[]'); }
             catch (e) { originalKioskItems = []; }
             if (!Array.isArray(originalKioskItems)) originalKioskItems = [];
@@ -240,6 +244,7 @@ $(document).ready(function () {
             const savedCart = localStorage.getItem(storage.cart);
 
             if (!savedCart) {
+                clearRewardContext();
                 return;
             }
 
@@ -252,6 +257,9 @@ $(document).ready(function () {
             } catch (e) {
                 localStorage.removeItem(storage.cart);
                 cart = [];
+            }
+            if (activeRewardCode && (kioskOrderId !== null || cart.length !== 1 || Number(cart[0].quantity) !== 1)) {
+                clearRewardContext();
             }
         }
 
@@ -266,7 +274,10 @@ $(document).ready(function () {
                 localStorage.setItem('pos_kiosk_items', JSON.stringify(originalKioskItems));
             } else {
                 localStorage.removeItem(storage.kioskOrderId);
+                localStorage.removeItem('pos_kiosk_items');
             }
+            if (activeRewardCode) localStorage.setItem(storage.rewardCode, activeRewardCode);
+            else localStorage.removeItem(storage.rewardCode);
         }
 
         function loadSavedCustomerName() {
@@ -296,7 +307,26 @@ $(document).ready(function () {
             localStorage.removeItem(storage.cart);
             localStorage.removeItem(storage.kioskOrderId);
             localStorage.removeItem('pos_kiosk_items');
+            localStorage.removeItem(storage.rewardCode);
+            activeRewardCode = null;
             originalKioskItems = [];
+        }
+
+        function clearRewardContext() {
+            if ($('#kiosk-reference-input').val() === activeRewardCode) $('#kiosk-reference-input').val('');
+            activeRewardCode = null;
+            localStorage.removeItem(storage.rewardCode);
+            $('#amount_paid').val('');
+        }
+
+        function renderRewardSummary() {
+            $('#pos-reward-summary').toggleClass('d-none', !activeRewardCode)
+                .text(activeRewardCode ? 'Free coffee reward: ' + activeRewardCode + '. Complete checkout to use this code.' : '');
+            $('#amount_paid').prop('readOnly', activeRewardCode !== null);
+            if (activeRewardCode) {
+                $('#amount_paid').val('0.00');
+                $('#kiosk-reference-input').val(activeRewardCode);
+            }
         }
 
         function clearSavedCustomerName() {
@@ -318,7 +348,7 @@ $(document).ready(function () {
                         const current = products.find(x => Number(x.product_id) === Number(item.product_id));
                         item.unavailable = !current || !canOrder(current);
                         if (original) { item.product_name = original.product_name; item.product_price = Number(original.unit_price); }
-                        else if (current) { item.product_name = current.product_name; item.product_price = Number(current.product_price); }
+                        else if (current) { item.product_name = current.product_name; item.product_price = activeRewardCode ? 0 : Number(current.product_price); }
                     });
                     saveCart();
                     renderCart();
@@ -404,6 +434,10 @@ $(document).ready(function () {
         function handleAddProduct(e) {
             e.preventDefault();
             if (loadingKiosk || checkingOut || deletingKiosk) return;
+            if (activeRewardCode) {
+                msgBox('error', 'Complete or clear this free coffee reward before adding other products.');
+                return;
+            }
 
             const id = $(this).data('id');
 
@@ -448,6 +482,7 @@ $(document).ready(function () {
         }
 
         function renderCart() {
+            renderRewardSummary();
             renderKioskQueue();
             if (!cart.length) {
                 $(s.cartList).html(`
@@ -474,6 +509,7 @@ $(document).ready(function () {
                                     ${formatMoney(item.product_price)} each
                                 </div>
                                 ${item.unavailable ? '<span class="badge badge-warning">Unavailable</span>' : ''}
+                                ${activeRewardCode ? '<span class="badge badge-success">Free coffee reward</span>' : ''}
                             </div>
 
                             <div class="text-right ml-3">
@@ -578,12 +614,21 @@ $(document).ready(function () {
                     Number(item.product_id) !== Number(id)
             );
 
+            if (activeRewardCode && !cart.length) {
+                clearRewardContext();
+                resetCheckoutKey();
+            }
+
             saveCart();
             renderCart();
         }
 
         function changeQuantity(id, amount) {
             if (checkingOut || deletingKiosk) return;
+            if (activeRewardCode && amount > 0) {
+                msgBox('error', 'A reward covers one coffee only.');
+                return;
+            }
             const item = cart.find(
                 (item) =>
                     Number(item.product_id) === Number(id)
@@ -606,6 +651,11 @@ $(document).ready(function () {
                     (item) =>
                         Number(item.product_id) !== Number(id)
                 );
+            }
+
+            if (activeRewardCode && !cart.length) {
+                clearRewardContext();
+                resetCheckoutKey();
             }
 
             saveCart();
@@ -645,12 +695,17 @@ $(document).ready(function () {
             const reference = String(value || '').trim().toUpperCase();
 
             if (!reference) {
-                msgBox('error', 'Enter a kiosk order reference.');
+                msgBox('error', 'Enter a kiosk order or reward reference.');
                 return;
             }
 
             if (cart.length > 0) {
-                msgBox('error', 'Clear the current cart before retrieving a kiosk order.');
+                msgBox('error', 'Clear the current cart before retrieving an order or reward.');
+                return;
+            }
+
+            if (reference.startsWith('GC-')) {
+                loadLoyaltyReward(reference);
                 return;
             }
 
@@ -690,6 +745,7 @@ $(document).ready(function () {
                 });
 
                 kioskOrderId = Number(order.kiosk_order_id);
+                activeRewardCode = null;
 
                 $(s.customerName).val(order.customer_name || '');
                 $('#amount_paid').val('');
@@ -707,6 +763,67 @@ $(document).ready(function () {
                 renderKioskQueue();
                 loadKioskQueue();
             });
+        }
+
+        async function loadLoyaltyReward(reference) {
+            loadingKiosk = true;
+            renderKioskQueue();
+            try {
+                const response = await $.ajax({
+                    url: `${base_url}/api/POS/reward/${encodeURIComponent(reference)}`,
+                    type: 'GET',
+                    dataType: 'json'
+                });
+                const reward = response && response.data;
+                if (!response || response.status !== 'success' || !reward
+                    || reward.reward_code !== reference || !Array.isArray(reward.products)) {
+                    msgBox('error', response && response.message || 'Unable to retrieve this reward.');
+                    return;
+                }
+                const choices = reward.products.filter(product => product.can_order !== false);
+                if (!choices.length) {
+                    msgBox('error', 'No coffee is currently available for this reward. Please try again later.');
+                    return;
+                }
+                const options = {};
+                choices.forEach(product => { options[String(product.product_id)] = product.product_name; });
+                const selection = await Swal.fire({
+                    title: 'Choose your free coffee',
+                    text: 'Reward ' + reward.reward_code + ' for ' + (reward.customer_name || 'loyal customer'),
+                    input: 'select',
+                    inputOptions: options,
+                    inputPlaceholder: 'Choose a coffee',
+                    showCancelButton: true,
+                    confirmButtonText: 'Load free coffee',
+                    inputValidator: value => value ? undefined : 'Choose a coffee to continue.'
+                });
+                if (!selection || !selection.isConfirmed) return;
+                const product = choices.find(item => Number(item.product_id) === Number(selection.value));
+                if (!product) {
+                    msgBox('error', 'Choose an available coffee.');
+                    return;
+                }
+
+                resetCheckoutKey();
+                activeRewardCode = reward.reward_code;
+                kioskOrderId = null;
+                originalKioskItems = [];
+                cart = [{product_id: Number(product.product_id), product_name: product.product_name,
+                    product_price: 0, quantity: 1, unavailable: false}];
+                $(s.customerName).val(reward.customer_name || '');
+                $('#kiosk-reference-input').val(activeRewardCode);
+                saveCustomerName();
+                saveCart();
+                renderCart();
+                msgBox('success', 'Reward loaded. Complete checkout to serve one free coffee.');
+            } catch (error) {
+                msgBox('error', error && error.responseJSON && error.responseJSON.message
+                    || 'Unable to retrieve this reward. Please try again.');
+            } finally {
+                loadingKiosk = false;
+                renderKioskQueue();
+                loadKioskQueue();
+            }
         }
 
         function handleCheckout(e) {
@@ -743,6 +860,7 @@ $(document).ready(function () {
             fd.append('amount_paid', amountPaid);
             fd.append('checkout_key', checkoutKey);
             fd.append('expected_total', updateTotal().toFixed(2));
+            if (activeRewardCode) fd.append('reward_code', activeRewardCode);
 
             fd.append(
                 'items',

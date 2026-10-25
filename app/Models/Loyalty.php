@@ -11,7 +11,7 @@ class Loyalty extends Model
     public function summary(int $userId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT loyalty_id, loyalty_points
+            'SELECT loyalty_points
              FROM loyal
              WHERE user_id = ?
              LIMIT 1'
@@ -26,14 +26,20 @@ class Loyalty extends Model
                 description,
                 activity_date,
                 points,
-                reward_code
+                reward_code,
+                used_sale_id,
+                used_at,
+                status
              FROM (
                 SELECT
                     \'earned\' AS activity_type,
                     \'Purchase point\' AS description,
                     earned_at AS activity_date,
                     1 AS points,
-                    NULL AS reward_code
+                    NULL AS reward_code,
+                    NULL AS used_sale_id,
+                    NULL AS used_at,
+                    NULL AS status
                 FROM loyalty_earnings
                 WHERE user_id = ?
 
@@ -44,7 +50,11 @@ class Loyalty extends Model
                     \'Free coffee reward\' AS description,
                     created_at AS activity_date,
                     -points_spent AS points,
-                    reward_code
+                    reward_code,
+                    used_sale_id,
+                    used_at,
+                    CASE WHEN used_sale_id IS NULL AND used_at IS NULL
+                        THEN \'available\' ELSE \'used\' END AS status
                 FROM loyalty_redemptions
                 WHERE user_id = ?
              ) AS activity
@@ -65,16 +75,45 @@ class Loyalty extends Model
         ];
     }
 
+    public function reward(string $code): array
+    {
+        $code = strtoupper(trim($code));
+        if (!preg_match('/^GC-[A-F0-9]{8}$/D', $code)) {
+            throw new \InvalidArgumentException('Enter a valid free coffee reward code.');
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT rewards.reward_code, users.username AS customer_name, rewards.user_id,
+                rewards.created_at, rewards.points_spent, rewards.used_sale_id, rewards.used_at
+             FROM loyalty_redemptions rewards
+             INNER JOIN users ON users.id = rewards.user_id
+             WHERE rewards.reward_code = ?'
+        );
+        $stmt->execute([$code]);
+        $reward = $stmt->fetch();
+        if (!$reward) throw new \Exception('Free coffee reward code not found.');
+        if ($reward->used_sale_id !== null || $reward->used_at !== null) {
+            throw new \Exception('This free coffee reward has already been used.');
+        }
+
+        return [
+            'reward_code' => $reward->reward_code,
+            'customer_name' => $reward->customer_name,
+            'user_id' => (int) $reward->user_id,
+            'created_at' => $reward->created_at,
+            'points_spent' => (int) $reward->points_spent,
+        ];
+    }
+
     public function redeem(int $userId): array
     {
         $this->db->beginTransaction();
 
         try {
             $stmt = $this->db->prepare(
-                'SELECT loyalty_id, loyalty_points
+                'SELECT loyalty_points
                  FROM loyal
-                 WHERE user_id = ?
-                 FOR UPDATE'
+                 WHERE user_id = ?' . $this->lockClause()
             );
             $stmt->execute([$userId]);
             $loyalty = $stmt->fetch();
@@ -87,11 +126,11 @@ class Loyalty extends Model
             $stmt = $this->db->prepare(
                 'UPDATE loyal
                  SET loyalty_points = loyalty_points - ?
-                 WHERE loyalty_id = ? AND loyalty_points >= ?'
+                 WHERE user_id = ? AND loyalty_points >= ?'
             );
             $stmt->execute([
                 self::POINTS_PER_REWARD,
-                $loyalty->loyalty_id,
+                $userId,
                 self::POINTS_PER_REWARD
             ]);
 

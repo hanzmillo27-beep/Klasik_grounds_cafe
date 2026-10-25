@@ -29,11 +29,11 @@
                 <div class="progress mb-3" style="height: 12px;">
                     <div id="loyalty-progress" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
                 </div>
-                <p class="text-muted text-center">Earn 1 point for a completed purchase made through your account. Only one point can be earned per day. Redeem 10 points for a free coffee.</p>
+                <p class="text-muted text-center">Earn 1 point for a completed purchase made through your account. Only one point can be earned per day. Exchange 10 points for a reward code, then show it to the cashier to choose one available free coffee.</p>
 
                 <div class="text-center mb-3">
                     <button id="loyalty-redeem" class="btn btn-success btn-lg" type="button" disabled>
-                        Redeem a Free Coffee
+                        Get a Free Coffee Code
                     </button>
                 </div>
                 <div id="loyalty-reward-code" class="alert alert-success text-center d-none" role="status"></div>
@@ -46,10 +46,10 @@
                 <div class="table-responsive">
                     <table class="table table-striped mb-0">
                         <thead>
-                            <tr><th>Activity</th><th>Date</th><th>Points</th><th>Reward code</th></tr>
+                            <tr><th>Activity</th><th>Date</th><th>Points</th><th>Reward code</th><th>Status</th></tr>
                         </thead>
                         <tbody id="loyalty-activity">
-                            <tr><td colspan="4" class="text-center text-muted">Loading activity…</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted">Loading activity…</td></tr>
                         </tbody>
                     </table>
                 </div>

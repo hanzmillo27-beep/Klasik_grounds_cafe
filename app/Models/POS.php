@@ -6,6 +6,7 @@ use Core\Model;
 use Core\Auth;
 use Core\SupabaseStorage;
 use Core\Money;
+use Core\RewardEligibility;
 
 class POS extends Model
 {
@@ -183,7 +184,18 @@ class POS extends Model
             if (!is_string($data['customer_name'] ?? '') || strlen(trim($data['customer_name'] ?? '')) > 100) {
                 throw new \Exception('Customer name must be at most 100 characters.');
             }
-            $fingerprint = $checkoutKey === null ? null : $this->checkoutFingerprint($data, $kioskOrderId);
+            $rewardCode = $this->rewardCode($data);
+            if ($rewardCode !== null) {
+                if ($kioskOrderId !== null) throw new \Exception('Use a reward separately from a kiosk order.');
+                $rewardItems = $this->cartQuantities($data['items'] ?? null);
+                if (count($rewardItems) !== 1 || reset($rewardItems) !== 1) {
+                    throw new \Exception('A reward covers exactly one coffee. Choose one item with quantity 1.');
+                }
+                if (Money::paymentCents($data['amount_paid'] ?? null) !== 0) {
+                    throw new \Exception('A free coffee reward requires no payment. Enter 0.00.');
+                }
+            }
+            $fingerprint = $checkoutKey === null ? null : $this->checkoutFingerprint($data, $kioskOrderId, $rewardCode);
 
             $userId = Auth::user()['id'] ?? null;
 
@@ -195,6 +207,17 @@ class POS extends Model
             if ($checkoutKey !== null && ($completed = $this->completedCheckout($checkoutKey, $userId, $fingerprint))) {
                 $this->db->commit();
                 return $completed;
+            }
+
+            if ($rewardCode !== null) {
+                $stmt = $this->db->prepare('SELECT reward_code, used_sale_id, used_at
+                    FROM loyalty_redemptions WHERE reward_code = ?' . $this->lockClause());
+                $stmt->execute([$rewardCode]);
+                $reward = $stmt->fetch();
+                if (!$reward) throw new \Exception('Reward code not found.');
+                if ($reward->used_sale_id !== null || $reward->used_at !== null) {
+                    throw new \Exception('This reward code has already been used.');
+                }
             }
 
             $kioskOrder = null;
@@ -279,6 +302,7 @@ class POS extends Model
                     'SELECT
                         product_id,
                         product_name,
+                        category_id,
                         product_price
                      FROM products
                      WHERE product_id = ? AND is_active = TRUE AND is_available = TRUE
@@ -293,6 +317,13 @@ class POS extends Model
                     throw new \Exception(
                         'A product in this order is unavailable. Please review the order.'
                     );
+                }
+                if ($rewardCode !== null) {
+                    $stmt = $this->db->prepare('SELECT category_name FROM categories WHERE category_id = ?' . $this->lockClause());
+                    $stmt->execute([$product->category_id]);
+                    if (!RewardEligibility::isCoffeeCategory($stmt->fetchColumn())) {
+                        throw new \Exception('Choose an eligible coffee for this reward.');
+                    }
                 }
 
                 /*
@@ -319,6 +350,7 @@ class POS extends Model
                     $productName = $product->product_name;
                     $unitPrice = $product->product_price;
                 }
+                if ($rewardCode !== null) $unitPrice = 0;
 
                 $unitCents = Money::cents($unitPrice);
                 $unitPrice = $unitCents / 100;
@@ -445,6 +477,13 @@ class POS extends Model
                 $deductInventory->execute([$required, $inventoryId, $required]);
                 if ($deductInventory->rowCount() !== 1) throw new \Exception('Inventory changed during checkout. Please try again.');
             }
+            if ($rewardCode !== null) {
+                $stmt = $this->db->prepare('UPDATE loyalty_redemptions
+                    SET used_sale_id = ?, used_at = CURRENT_TIMESTAMP
+                    WHERE reward_code = ? AND used_sale_id IS NULL AND used_at IS NULL');
+                $stmt->execute([$saleId, $rewardCode]);
+                if ($stmt->rowCount() !== 1) throw new \Exception('This reward code has already been used.');
+            }
             /*
              * Mark the kiosk order completed in the same transaction.
              * If this update fails, all sale and inventory changes roll back.
@@ -537,12 +576,23 @@ class POS extends Model
         return $items;
     }
 
-    private function checkoutFingerprint(array $data, ?int $kioskId): string
+    private function rewardCode(array $data): ?string
+    {
+        if (!array_key_exists('reward_code', $data)) return null;
+        if (!is_string($data['reward_code'])) throw new \InvalidArgumentException('Enter a valid reward code (GC-XXXXXXXX).');
+        $code = strtoupper(trim($data['reward_code']));
+        if (!preg_match('/^GC-[A-F0-9]{8}$/D', $code)) throw new \InvalidArgumentException('Enter a valid reward code (GC-XXXXXXXX).');
+        return $code;
+    }
+
+    private function checkoutFingerprint(array $data, ?int $kioskId, ?string $rewardCode = null): string
     {
         $items = $this->cartQuantities($data['items'] ?? null);
-        return hash('sha256', json_encode([$items, trim($data['customer_name'] ?? ''),
+        $payload = [$items, trim($data['customer_name'] ?? ''),
             Money::paymentCents($data['amount_paid'] ?? null), $kioskId,
-            isset($data['expected_total']) ? Money::cents($data['expected_total']) : null]));
+            isset($data['expected_total']) ? Money::cents($data['expected_total']) : null];
+        if ($rewardCode !== null) $payload[] = $rewardCode;
+        return hash('sha256', json_encode($payload));
     }
 
     private function completedCheckout(string $key, int $userId, string $fingerprint): ?array

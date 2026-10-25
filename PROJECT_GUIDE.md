@@ -266,6 +266,7 @@ API controllers accept `$_POST` or JSON-decoded request data, validate it, call 
 - Returns products and one product with ingredients.
 - `GET /api/POS/kioskOrders` returns unpaid kiosk order summaries for cashiers and owners: pending orders plus orders claimed by the current account, oldest first.
 - `POST /api/POS/deleteKioskOrder/{id}` removes an unpaid order from the queue. Completed orders and orders claimed by another cashier are protected.
+- `GET /api/POS/reward/{code}` retrieves an unused `GC-XXXXXXXX` loyalty reward and its available coffee choices. Kiosk references remain separate `KG-` codes.
 - Lists transactions and transaction details.
 - Accepts checkout data and returns loyalty results when a point is earned.
 
@@ -343,6 +344,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Uses ten points as the reward threshold.
 - `summary()` reads the point balance, redemptions, earnings, and activity.
 - `redeem()` locks the loyalty row, checks the threshold, subtracts ten points, creates a redemption code, and commits atomically.
+- `reward()` retrieves an existing reward without spending more points or consuming it. Activity marks issued codes ready for the cashier until a successful checkout records `used_sale_id` and `used_at`.
 
 ### `app/Models/POS.php`
 
@@ -352,6 +354,8 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - `checkout()` is the largest business transaction in the app.
 - It validates the logged-in cashier, optionally loads a kiosk order, locks products and ingredients, verifies prices and stock, inserts a sale and sale items, deducts inventory, completes a kiosk order, and awards at most one loyalty point per day.
 - It rolls back all changes if any part fails.
+- Reward checkout locks the issued code, accepts exactly one eligible coffee with quantity one and no kiosk order, calculates a zero price on the server, deducts its ingredients, and marks the code used in the same transaction. Retries with the same checkout key recover the saved sale; another checkout cannot reuse the code. Free coffees earn no new point.
+- `Core\\RewardEligibility` recognizes the normalized categories Coffee, Coffee-based, Specialty coffee, Hot coffee, Iced coffee, Cold coffee, and Espresso. Non-coffee categories are excluded.
 
 ## 8. Views
 
@@ -492,6 +496,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Refreshes the kiosk queue every 15 seconds while visible, on window focus, and through its Refresh button. Queue loads use the existing claim flow and require an empty cart.
 - Queue Delete asks for confirmation. It clears the current sale only after successful deletion of its loaded kiosk order; deleting another order preserves the current cart.
 - Loads kiosk orders by reference.
+- The same Retrieve field accepts loyalty `GC-` codes, prompts for a coffee, and loads a separate one-coffee reward cart at zero price. The code and zero price survive reloads; clearing the cart leaves the reward unused until it is checked out.
 - Sends checkout data to `/api/POS/checkout`.
 - Renders transaction history and transaction details.
 - Shows loyalty-point results after checkout.
@@ -501,6 +506,7 @@ All models extend `Core\\Model`, so they use PDO prepared statements and the con
 - Loads the loyalty summary.
 - Renders balance, progress, and activity.
 - Posts redemption requests and shows the generated reward code.
+- Displays ready and used reward statuses, restores ready codes after reload, and prevents duplicate redemption requests while one is pending.
 
 ## 10. CSS and static assets
 
@@ -587,4 +593,6 @@ POS cart or kiosk order -> `/api/POS/checkout` -> locked product/ingredient rows
 
 ### Loyalty redemption
 
-Loyalty page -> `/api/Loyalty/summary` -> points/activity display -> POST `/api/Loyalty/redeem` -> locked balance check -> ten-point deduction -> redemption code.
+Loyalty page -> POST `/api/Loyalty/redeem` -> ten-point deduction -> issued `GC-` code -> POS Retrieve -> choose one available coffee -> zero-value checkout -> inventory deduction and used-code marker -> receipt. The customer uses the exact issued code; it is not a kiosk order reference.
+
+Before deploying this reward checkout flow, apply `php scripts/migrate.php 036_loyalty_reward_use.sql` with the PostgreSQL PDO extension enabled. This adds nullable `used_sale_id` and `used_at` columns to existing redemptions without replacing issued codes. Focused checks are `php tests/loyalty_rewards.php`, `php tests/loyalty_checkout.php`, and `powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser-pos.ps1`.
