@@ -8,7 +8,7 @@
         </button>
     </div>
     <div class="card-body">
-        <p class="text-muted small mb-2">Oldest orders first. Waiting orders and orders you have retrieved appear here. Start a new sale before loading another order.</p>
+        <p class="text-muted small mb-2">Oldest orders first. Start a new sale before loading another order, or delete an unpaid order you no longer need.</p>
         <p id="kiosk-queue-message" class="small text-muted mb-2" role="status" aria-live="polite"></p>
         <div class="table-responsive" style="max-height: 20rem;">
             <table class="table table-hover mb-0">

@@ -174,6 +174,43 @@ class Kiosk extends Model
         return $orders;
     }
 
+    public function deleteOrder(int $id, int $userId): void
+    {
+        if ($id < 1 || $userId < 1) throw new \InvalidArgumentException('Invalid kiosk order.');
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare(
+                'SELECT kiosk_order_id, status, claimed_by, sale_id
+                 FROM kiosk_orders WHERE kiosk_order_id = ? ' . $this->lockClause()
+            );
+            $stmt->execute([$id]);
+            $order = $stmt->fetch();
+            if (!$order) throw new \Exception('Kiosk order not found.');
+            if ($order->status === 'completed' || $order->sale_id !== null) {
+                throw new \Exception('This kiosk order has already been checked out.');
+            }
+            if (!in_array($order->status, ['pending', 'claimed'], true)) {
+                throw new \Exception('This kiosk order is no longer available.');
+            }
+            if ($order->status === 'claimed' && (int) $order->claimed_by !== $userId) {
+                throw new \Exception('This kiosk order is claimed by another cashier.');
+            }
+            $stmt = $this->db->prepare(
+                'UPDATE kiosk_orders SET status = \'cancelled\'
+                 WHERE kiosk_order_id = ? AND status = ? AND sale_id IS NULL
+                    AND (status = \'pending\' OR claimed_by = ?)'
+            );
+            $stmt->execute([$id, $order->status, $userId]);
+            if ($stmt->rowCount() !== 1) {
+                throw new \Exception('This kiosk order changed. Refresh the queue and try again.');
+            }
+            $this->db->commit();
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
+    }
+
     public function findByReference($reference)
     {
         $stmt = $this->db->prepare(

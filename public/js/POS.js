@@ -33,6 +33,7 @@ $(document).ready(function () {
         let originalKioskItems = [];
         let loadingKiosk = false;
         let checkingOut = false;
+        let deletingKiosk = false;
         let productRequestNumber = 0;
         let kioskOrders = [];
         let kioskQueueState = 'loading';
@@ -93,8 +94,9 @@ $(document).ready(function () {
                 const order = kioskOrders.find(item => Number(item.kiosk_order_id) === id);
                 if (order) loadKioskOrder(order.reference_code);
             });
+            $(s.kioskQueue).on('click', '.btn-delete-queued-order', handleDeleteKioskOrder);
             $(window).on('focus.posAvailability', function () {
-                if (!checkingOut && !loadingKiosk) {
+                if (!checkingOut && !loadingKiosk && !deletingKiosk) {
                     loadProducts();
                     loadKioskQueue();
                 }
@@ -102,7 +104,7 @@ $(document).ready(function () {
         }
 
         function loadKioskQueue() {
-            if (checkingOut || loadingKiosk || !$(s.kioskQueue).length) return;
+            if (checkingOut || loadingKiosk || deletingKiosk || !$(s.kioskQueue).length) return;
             const number = ++kioskQueueRequestNumber;
             if (kioskQueueRequest && kioskQueueRequest.abort) kioskQueueRequest.abort();
             $(s.refreshKioskQueueBtn).prop('disabled', true);
@@ -127,7 +129,7 @@ $(document).ready(function () {
             }).always(function () {
                 if (number !== kioskQueueRequestNumber) return;
                 kioskQueueRequest = null;
-                $(s.refreshKioskQueueBtn).prop('disabled', loadingKiosk || checkingOut);
+                $(s.refreshKioskQueueBtn).prop('disabled', loadingKiosk || checkingOut || deletingKiosk);
             });
         }
 
@@ -155,15 +157,77 @@ $(document).ready(function () {
                         <td>${formatMoney(order.total_amount)}</td>
                         <td>${escapeHtml(formatDate(order.created_at))}</td>
                         <td><span class="badge ${claimed ? 'badge-info' : 'badge-warning'}">${current ? 'In current sale' : claimed ? 'Retrieved by you' : 'Waiting'}</span></td>
-                        <td class="text-right"><button type="button" class="btn btn-primary btn-sm btn-load-queued-order"
-                            data-order-id="${Number(order.kiosk_order_id)}" ${loadingKiosk || checkingOut || cart.length > 0 ? 'disabled' : ''}>
+                        <td class="text-right text-nowrap"><button type="button" class="btn btn-primary btn-sm btn-load-queued-order mr-2"
+                            data-order-id="${Number(order.kiosk_order_id)}" ${loadingKiosk || checkingOut || deletingKiosk || cart.length > 0 ? 'disabled' : ''}>
                             ${current ? 'In current sale' : claimed ? 'Resume order' : 'Load order'}
+                        </button><button type="button" class="btn btn-outline-danger btn-sm btn-delete-queued-order"
+                            data-order-id="${Number(order.kiosk_order_id)}" ${loadingKiosk || checkingOut || deletingKiosk ? 'disabled' : ''}>
+                            Delete
                         </button></td>
                     </tr>`;
                 }).join(''));
             }
-            $('#btn-load-kiosk-order').prop('disabled', loadingKiosk || checkingOut);
-            $(s.refreshKioskQueueBtn).prop('disabled', loadingKiosk || checkingOut || kioskQueueRequest !== null);
+            $('#btn-load-kiosk-order').prop('disabled', loadingKiosk || checkingOut || deletingKiosk);
+            $(s.refreshKioskQueueBtn).prop('disabled', loadingKiosk || checkingOut || deletingKiosk || kioskQueueRequest !== null);
+            $(s.checkoutBtn).prop('disabled', loadingKiosk || checkingOut || deletingKiosk);
+            $(s.clearBtn).prop('disabled', loadingKiosk || checkingOut || deletingKiosk);
+            $(s.customerName).prop('disabled', deletingKiosk);
+            $('#amount_paid').prop('disabled', checkingOut || deletingKiosk);
+        }
+
+        async function handleDeleteKioskOrder(event) {
+            event.preventDefault();
+            if (loadingKiosk || checkingOut || deletingKiosk) return;
+            const id = Number($(this).data('order-id'));
+            const order = kioskOrders.find(item => Number(item.kiosk_order_id) === id);
+            if (!order) return;
+
+            deletingKiosk = true;
+            renderKioskQueue();
+            try {
+                const result = await Swal.fire({
+                    title: 'Delete kiosk order?',
+                    text: 'Remove ' + order.reference_code + ' from the queue?'
+                        + (id === kioskOrderId ? ' Its current sale will also be cleared.' : ''),
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete order',
+                    cancelButtonText: 'Keep order',
+                    confirmButtonColor: '#b42318',
+                    focusCancel: true
+                });
+                if (!result || !result.isConfirmed) return;
+
+                const response = await $.ajax({
+                    url: `${base_url}/api/POS/deleteKioskOrder/${id}`,
+                    type: 'POST',
+                    dataType: 'json'
+                });
+                if (!response || response.status !== 'success') {
+                    msgBox('error', response && response.message || 'Unable to delete kiosk order.');
+                    return;
+                }
+
+                if (id === kioskOrderId) {
+                    resetCheckoutKey();
+                    cart = [];
+                    kioskOrderId = null;
+                    clearSavedCart();
+                    clearSavedCustomerName();
+                    $(s.customerName).val('');
+                    $('#kiosk-reference-input, #amount_paid').val('');
+                    renderCart();
+                }
+                kioskOrders = kioskOrders.filter(item => Number(item.kiosk_order_id) !== id);
+                msgBox('success', response.message || 'Kiosk order deleted.');
+            } catch (error) {
+                msgBox('error', error && error.responseJSON && error.responseJSON.message
+                    || 'Unable to delete kiosk order. Please try again.');
+            } finally {
+                deletingKiosk = false;
+                renderKioskQueue();
+                loadKioskQueue();
+            }
         }
 
         function loadSavedCart() {
@@ -339,7 +403,7 @@ $(document).ready(function () {
 
         function handleAddProduct(e) {
             e.preventDefault();
-            if (loadingKiosk || checkingOut) return;
+            if (loadingKiosk || checkingOut || deletingKiosk) return;
 
             const id = $(this).data('id');
 
@@ -505,7 +569,7 @@ $(document).ready(function () {
 
         function handleRemove(e) {
             e.preventDefault();
-            if (checkingOut) return;
+            if (checkingOut || deletingKiosk) return;
 
             const id = $(this).data('id');
 
@@ -519,7 +583,7 @@ $(document).ready(function () {
         }
 
         function changeQuantity(id, amount) {
-            if (checkingOut) return;
+            if (checkingOut || deletingKiosk) return;
             const item = cart.find(
                 (item) =>
                     Number(item.product_id) === Number(id)
@@ -550,9 +614,10 @@ $(document).ready(function () {
 
         function handleClearCart(e) {
             e.preventDefault();
-            if (loadingKiosk || checkingOut) return;
+            if (loadingKiosk || checkingOut || deletingKiosk) return;
 
             function newOrder() {
+                if (loadingKiosk || checkingOut || deletingKiosk) return;
                 resetCheckoutKey();
                 cart = [];
                 kioskOrderId = null;
@@ -575,7 +640,7 @@ $(document).ready(function () {
         }
 
         function loadKioskOrder(value) {
-            if (loadingKiosk || checkingOut) return;
+            if (loadingKiosk || checkingOut || deletingKiosk) return;
 
             const reference = String(value || '').trim().toUpperCase();
 
@@ -646,7 +711,7 @@ $(document).ready(function () {
 
         function handleCheckout(e) {
             e.preventDefault();
-            if (loadingKiosk || checkingOut) return;
+            if (loadingKiosk || checkingOut || deletingKiosk) return;
             if (cart.some(item => item.unavailable)) {
                 msgBox('error', 'Remove unavailable products from this order before checkout.');
                 return;

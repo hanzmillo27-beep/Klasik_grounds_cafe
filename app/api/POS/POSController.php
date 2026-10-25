@@ -49,6 +49,27 @@ class POSController extends BaseController
         ]);
     }
 
+    public function deleteKioskOrder($id = null)
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status'=>'error','message'=>'Use POST to delete a kiosk order.']);
+        }
+        $id = filter_var($id, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) {
+            http_response_code(400);
+            $this->json(['status'=>'error','message'=>'Choose a valid kiosk order.']);
+        }
+        try {
+            (new Kiosk())->deleteOrder($id, (int) (Auth::user()['id'] ?? 0));
+        } catch (\Throwable $error) {
+            http_response_code(409);
+            $this->json(['status'=>'error','message'=>$error->getMessage()]);
+            return;
+        }
+        $this->json(['status'=>'success','message'=>'Kiosk order deleted.']);
+    }
+
     public function transactions()
     {
         $this->json([

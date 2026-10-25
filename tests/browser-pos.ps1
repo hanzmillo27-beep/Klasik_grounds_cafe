@@ -58,6 +58,7 @@ window.__posHarness = {
     generation: String(Date.now()) + Math.random(),
     errors: [], requests: [], messages: [], allowCheckout: false,
     queueFetches: 0, queueResponses: [], intervals: [],
+    confirmationResponses: [], dialogs: [], deleteResponses: [], cancelledOrders: [],
     queueOrders: [
         {kiosk_order_id: 42, reference_code: 'KG-BROWSER', customer_name: 'Kiosk customer',
             total_amount: 391, created_at: '2026-10-19 10:00:00', item_count: 3,
@@ -99,8 +100,14 @@ window.addEventListener('unhandledrejection', function (event) {
 });
 window.msgBox = function (status, message) { __posHarness.messages.push({status: status, message: message}); };
 window.handleAjaxError = function () { __posHarness.errors.push('Unexpected AJAX failure.'); };
-// Confirm New order deterministically; the test exercises POS behavior, not SweetAlert.
-window.Swal = {fire: function () { return Promise.resolve({isConfirmed: true}); }};
+// Keep confirmations deterministic while exercising both cancellation and confirmation.
+window.Swal = {fire: function (options) {
+    __posHarness.dialogs.push(options);
+    const fixture = __posHarness.confirmationResponses.shift() || {isConfirmed: true};
+    return new Promise(resolve => setTimeout(function () {
+        resolve({isConfirmed: fixture.isConfirmed !== false});
+    }, fixture.delay || 0));
+}};
 const nativeSetInterval = window.setInterval;
 window.setInterval = function (callback, milliseconds) {
     __posHarness.intervals.push({callback: callback, milliseconds: milliseconds});
@@ -109,7 +116,7 @@ window.setInterval = function (callback, milliseconds) {
 $.ajax = function (options) {
     var deferred = $.Deferred(), path = new URL(options.url).pathname;
     __posHarness.requests.push({path: path, method: options.type || 'GET'});
-    var response, delay = 0, rejection = null, ignoreAbort = false;
+    var response, delay = 0, rejection = null, ignoreAbort = false, beforeResolve = null;
     function requireFixture(condition, message) {
         if (!condition) { __posHarness.errors.push(message); throw new Error(message); }
     }
@@ -129,6 +136,19 @@ $.ajax = function (options) {
         __posHarness.queueOrders.find(order => order.kiosk_order_id === 42).status = 'claimed';
         response = {status: 'success', data: __posHarness.order};
         delay = 100;
+    } else if (/^\/api\/POS\/deleteKioskOrder\/(42|43)$/.test(path)) {
+        requireFixture(options.type === 'POST', 'Deleting a queued kiosk order must use POST.');
+        const id = Number(path.split('/').pop());
+        const order = __posHarness.queueOrders.find(order => order.kiosk_order_id === id);
+        requireFixture(order && ['pending', 'claimed'].includes(order.status), 'Only an available fixture order may be deleted.');
+        const fixture = __posHarness.deleteResponses.shift() || {};
+        response = fixture.response || {status: 'success', message: 'Kiosk order deleted.'};
+        rejection = fixture.failure || null;
+        delay = fixture.delay == null ? 80 : fixture.delay;
+        if (!rejection && response.status === 'success') beforeResolve = function () {
+            __posHarness.cancelledOrders.push(Object.assign({}, order, {status: 'cancelled'}));
+            __posHarness.queueOrders = __posHarness.queueOrders.filter(order => order.kiosk_order_id !== id);
+        };
     } else if (path === '/api/POS/checkout' && __posHarness.allowCheckout) {
         __posHarness.allowCheckout = false;
         requireFixture(options.type === 'POST' && options.data instanceof FormData, 'Checkout must POST FormData.');
@@ -159,7 +179,10 @@ $.ajax = function (options) {
     const snapshot = JSON.parse(JSON.stringify(response));
     const timer = setTimeout(function () {
         if (rejection) deferred.reject(rejection, 'error');
-        else deferred.resolve(snapshot);
+        else {
+            if (beforeResolve) beforeResolve();
+            deferred.resolve(snapshot);
+        }
     }, delay);
     const promise = deferred.promise();
     promise.abort = function () {
@@ -251,10 +274,19 @@ function click(selector) {
 }
 function cart() { return JSON.parse(localStorage.getItem('pos_cart') || '[]'); }
 function queueButton(id) { return document.querySelector('#kiosk-order-queue .btn-load-queued-order[data-order-id="' + id + '"]'); }
+function deleteButton(id) { return document.querySelector('#kiosk-order-queue .btn-delete-queued-order[data-order-id="' + id + '"]'); }
 function claimCount() { return h.requests.filter(request => request.path.includes('/claim/')).length; }
+function deleteCount() { return h.requests.filter(request => request.path.includes('/deleteKioskOrder/')).length; }
+function saleSnapshot() {
+    const keys = ['pos_cart', 'pos_customer_name', 'pos_kiosk_order_id', 'pos_kiosk_items', 'pos_checkout_key'];
+    return JSON.stringify({saved: keys.map(key => [key, localStorage.getItem(key)]),
+        customer: $('#customer_name').val(), payment: $('#amount_paid').val(),
+        reference: $('#kiosk-reference-input').val(), total: $('#cart-total').text()});
+}
 function assertQueue(count) {
     assert(Number($('#kiosk-queue-count').text().trim()) === count, 'Queue badge does not match the available order count.');
     assert($('#kiosk-order-queue .btn-load-queued-order').length === count, 'Queue rows do not match the available orders.');
+    assert($('#kiosk-order-queue .btn-delete-queued-order').length === count, 'Each queued order must have a Delete order control.');
     assert(!h.errors.length, 'Queue produced browser errors: ' + h.errors.join('; '));
 }
 async function waitFor(condition, message) {
@@ -456,9 +488,15 @@ assertCart([], 0);
 $('#customer_name').val('Stale name').trigger('input');
 $('#amount_paid').val('999.99');
 const beforeClaimQueue = h.queueFetches;
+const beforeClaimDeletes = deleteCount(), beforeClaimDialogs = h.dialogs.length;
 click('#kiosk-order-queue .btn-load-queued-order[data-order-id="42"]');
 assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-load-queued-order')).every(button => button.disabled),
     'All queued-order Load buttons must lock during a claim.');
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-delete-queued-order')).every(button => button.disabled),
+    'All queued-order Delete buttons must lock during a claim.');
+$(deleteButton(42)).prop('disabled', false).trigger('click');
+assert(deleteCount() === beforeClaimDeletes && h.dialogs.length === beforeClaimDialogs,
+    'A forced Delete click opened confirmation or sent a request during a claim.');
 click('.btn-add-product[data-id="3"]');
 $(queueButton(42)).prop('disabled', false).trigger('click');
 $('#kiosk-reference-input').val('KG-BROWSER');
@@ -561,12 +599,18 @@ assertChange(49.70);
 const previousKey = localStorage.getItem('pos_checkout_key');
 h.expectedCheckout = {key: previousKey};
 const beforeCheckoutQueue = h.queueFetches, beforeCheckoutClaims = claimCount();
+const beforeCheckoutDeletes = deleteCount(), beforeCheckoutDialogs = h.dialogs.length;
 h.queueOrders = h.queueOrders.filter(order => order.kiosk_order_id !== 42);
 h.allowCheckout = true;
 click('#btnCheckout');
 assert($('#amount_paid').prop('disabled') && $('#btnCheckout').prop('disabled'), 'Payment controls must lock during checkout.');
 assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-load-queued-order')).every(button => button.disabled),
     'Queue Load controls must remain disabled during checkout.');
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue .btn-delete-queued-order')).every(button => button.disabled),
+    'Queue Delete controls must remain disabled during checkout.');
+$(deleteButton(42)).prop('disabled', false).trigger('click');
+assert(deleteCount() === beforeCheckoutDeletes && h.dialogs.length === beforeCheckoutDialogs,
+    'A forced Delete click opened confirmation or sent a request during checkout.');
 $(queueButton(42)).prop('disabled', false).trigger('click');
 assert(claimCount() === beforeCheckoutClaims, 'A forced queue click started a claim during checkout.');
 for (let attempt = 0; attempt < 100; attempt++) {
@@ -607,6 +651,126 @@ assertOffline(1);
 return 'One offline checkout sends the visible cart/payment/total/key, locks queue claims, clears the cart, refreshes the queue, and automatically displays a complete sales receipt.';
 '@
     Write-Output (Evaluate-Js ('(async () => {' + $assertions + $receiptPhase + '})()'))
+    $deletePhase = @'
+// Model a later queue, including an order still claimed by this cashier.
+h.queueOrders.unshift({kiosk_order_id: 42, reference_code: 'KG-BROWSER', customer_name: 'Kiosk customer',
+    total_amount: 391, created_at: '2026-10-19 10:00:00', status: 'claimed', item_count: 3});
+click('#btn-refresh-kiosk-queue');
+await waitFor(() => queueButton(42) && deleteButton(43) && !$('#btn-refresh-kiosk-queue').prop('disabled'),
+    'The deletion fixture queue did not load.');
+assertQueue(2);
+click('.btn-add-product[data-id="3"]');
+$('#customer_name').val('Unrelated sale customer').trigger('input');
+$('#amount_paid').val('100.00').trigger('input');
+assertCart([[3, 1, 50]], 50);
+assert(!deleteButton(43).disabled, 'An occupied normal sale must still allow deleting another queued order.');
+const unrelatedSale = saleSnapshot();
+const beforeCancelledDelete = deleteCount(), beforeDeleteClaims = claimCount(), beforeDeleteDialogs = h.dialogs.length;
+const beforeCancelledRefresh = h.queueFetches;
+h.confirmationResponses.push({isConfirmed: false, delay: 80});
+click('#kiosk-order-queue .btn-delete-queued-order[data-order-id="43"]');
+assert(h.dialogs.length === beforeDeleteDialogs + 1
+    && h.dialogs[h.dialogs.length - 1].title === 'Delete kiosk order?'
+    && h.dialogs[h.dialogs.length - 1].confirmButtonText === 'Delete order', 'Deleting an order requires an explicit Delete order confirmation.');
+assert(Array.from(document.querySelectorAll('#kiosk-order-queue button')).every(button => button.disabled)
+    && $('#btn-load-kiosk-order').prop('disabled') && $('#btnCheckout').prop('disabled') && $('#btnClear').prop('disabled'),
+    'Confirmation must lock queue, retrieval, checkout, and New order controls.');
+assert(deleteCount() === beforeCancelledDelete && saleSnapshot() === unrelatedSale,
+    'Opening Delete confirmation must not send a deletion or change the current sale.');
+// Bypass disabled HTML controls to verify the shared guards during confirmation.
+$(deleteButton(43)).prop('disabled', false).trigger('click');
+$(queueButton(42)).prop('disabled', false).trigger('click');
+$('#kiosk-reference-input').val('KG-BROWSER');
+$('#btn-load-kiosk-order').prop('disabled', false).trigger('click');
+$('#kiosk-reference-input').val('');
+$('#btnCheckout').prop('disabled', false).trigger('click');
+$('#btnClear').prop('disabled', false).trigger('click');
+$('.btn-add-product[data-id="1"]').prop('disabled', false).trigger('click');
+$('.btn-increase[data-id="3"]').prop('disabled', false).trigger('click');
+$('.btn-decrease[data-id="3"]').prop('disabled', false).trigger('click');
+$('.btn-remove[data-id="3"]').prop('disabled', false).trigger('click');
+assert(deleteCount() === beforeCancelledDelete && claimCount() === beforeDeleteClaims
+    && h.dialogs.length === beforeDeleteDialogs + 1, 'A second action escaped the pending Delete confirmation guard.');
+assert(saleSnapshot() === unrelatedSale, 'A forced action changed the sale while deletion confirmation was pending.');
+await waitFor(() => h.queueFetches > beforeCancelledRefresh && !$('#btn-refresh-kiosk-queue').prop('disabled')
+    && deleteButton(43) && !deleteButton(43).disabled, 'Cancelling Delete did not finish refreshing and unlock the queue.');
+assert(deleteCount() === beforeCancelledDelete && saleSnapshot() === unrelatedSale,
+    'Cancelling Delete sent a request or changed the current sale.');
+assertQueue(2);
+const beforeFailedDelete = deleteCount(), beforeFailedMessages = h.messages.length;
+const beforeFailedRefresh = h.queueFetches;
+h.deleteResponses.push({response: {status: 'error', message: 'This fixture order cannot be deleted.'}});
+click('#kiosk-order-queue .btn-delete-queued-order[data-order-id="43"]');
+await waitFor(() => deleteCount() === beforeFailedDelete + 1 && h.queueFetches > beforeFailedRefresh
+    && !$('#btn-refresh-kiosk-queue').prop('disabled') && deleteButton(43) && !deleteButton(43).disabled,
+    'A failed Delete did not finish and unlock its controls.');
+assert(saleSnapshot() === unrelatedSale, 'A rejected pending-order deletion changed the unrelated sale.');
+assert(h.messages.slice(beforeFailedMessages).some(message => message.status === 'error'), 'A rejected deletion needs an error message.');
+assertQueue(2);
+const beforePendingDelete = deleteCount(), beforePendingRefresh = h.queueFetches;
+click('#kiosk-order-queue .btn-delete-queued-order[data-order-id="43"]');
+await waitFor(() => deleteCount() === beforePendingDelete + 1, 'Confirming Delete did not POST the pending kiosk order ID.');
+assert(saleSnapshot() === unrelatedSale, 'The sale changed before a pending-order deletion succeeded.');
+const pendingDeleteDialogs = h.dialogs.length;
+$(deleteButton(43)).prop('disabled', false).trigger('click');
+assert(deleteCount() === beforePendingDelete + 1 && h.dialogs.length === pendingDeleteDialogs,
+    'A duplicate click created another Delete confirmation or POST.');
+await waitFor(() => !deleteButton(43) && h.queueFetches > beforePendingRefresh
+    && !$('#btn-refresh-kiosk-queue').prop('disabled') && deleteButton(42),
+    'Successful pending-order deletion did not refresh the queue.');
+assertQueue(1);
+assert(saleSnapshot() === unrelatedSale, 'Deleting another kiosk order changed the current sale or checkout key.');
+assert(h.cancelledOrders.some(order => order.kiosk_order_id === 43 && order.status === 'cancelled'),
+    'The deleted pending fixture order must leave the waiting queue.');
+// Load the own-claimed order, then verify that only successful deletion clears it.
+click('#btnClear');
+await waitFor(() => cart().length === 0, 'New order did not clear the unrelated fixture sale.');
+click('#kiosk-order-queue .btn-load-queued-order[data-order-id="42"]');
+await waitFor(() => cart().length === 2 && !$('#btn-refresh-kiosk-queue').prop('disabled'),
+    'The own-claimed order did not load before active-order deletion.');
+assertCart([[1, 2, 125.5], [2, 1, 140]], 391);
+$('#customer_name').val('Active kiosk edit').trigger('input');
+$('#amount_paid').val('500.00').trigger('input');
+const activeSale = saleSnapshot(), activeKey = localStorage.getItem('pos_checkout_key');
+assert(!deleteButton(42).disabled, 'An active own-claimed kiosk order must allow Delete order.');
+const beforeActiveCancel = deleteCount(), beforeActiveCancelRefresh = h.queueFetches;
+h.confirmationResponses.push({isConfirmed: false});
+click('#kiosk-order-queue .btn-delete-queued-order[data-order-id="42"]');
+await waitFor(() => h.queueFetches > beforeActiveCancelRefresh && !$('#btn-refresh-kiosk-queue').prop('disabled')
+    && deleteButton(42) && !deleteButton(42).disabled, 'Cancelling active-order deletion did not finish refreshing and unlock the sale.');
+assert(deleteCount() === beforeActiveCancel && saleSnapshot() === activeSale,
+    'Cancelling active-order deletion lost the cart, kiosk context, payment, customer, or checkout key.');
+const beforeActiveFailure = deleteCount(), beforeActiveFailureRefresh = h.queueFetches;
+const beforeActiveFailureMessages = h.messages.length;
+h.deleteResponses.push({failure: {status: 409,
+    responseJSON: {status: 'error', message: 'The active fixture order was not deleted.'}}});
+click('#kiosk-order-queue .btn-delete-queued-order[data-order-id="42"]');
+await waitFor(() => deleteCount() === beforeActiveFailure + 1 && h.queueFetches > beforeActiveFailureRefresh
+    && !$('#btn-refresh-kiosk-queue').prop('disabled') && deleteButton(42) && !deleteButton(42).disabled,
+    'Failed active-order deletion did not restore its controls.');
+assert(saleSnapshot() === activeSale, 'Failed active-order deletion cleared the current sale before success.');
+assert(h.messages.slice(beforeActiveFailureMessages).some(message => message.status === 'error'
+    && message.message === 'The active fixture order was not deleted.'), 'A failed active-order deletion must display the server error message.');
+const beforeActiveDelete = deleteCount(), beforeActiveRefresh = h.queueFetches;
+click('#kiosk-order-queue .btn-delete-queued-order[data-order-id="42"]');
+await waitFor(() => deleteCount() === beforeActiveDelete + 1, 'Confirming active-order Delete did not send its POST.');
+assert(saleSnapshot() === activeSale, 'Active-order Delete cleared the sale before the server confirmed success.');
+await waitFor(() => !deleteButton(42) && h.queueFetches > beforeActiveRefresh
+    && !$('#btn-refresh-kiosk-queue').prop('disabled') && !$('#btnCheckout').prop('disabled'),
+    'Successful active-order deletion did not clear and unlock the current sale.');
+assertQueue(0);
+assertCart([], 0);
+assert(!localStorage.getItem('pos_kiosk_order_id') && !localStorage.getItem('pos_kiosk_items')
+    && !localStorage.getItem('pos_customer_name'), 'Deleting the active order retained its saved kiosk or customer context.');
+assert(!$('#customer_name').val() && !$('#kiosk-reference-input').val() && !$('#amount_paid').val(),
+    'Deleting the active order retained its customer, reference, or payment inputs.');
+assert(localStorage.getItem('pos_checkout_key') !== activeKey, 'Deleting the active order must start a fresh checkout key.');
+assertChange(null);
+assert($('#transaction-details').text().includes('#77'), 'Deleting kiosk orders altered the completed-sale receipt.');
+assertOffline(1);
+return 'Delete confirmation/cancel, busy and duplicate guards, pending-order preservation, error recovery, and successful active-order cart/context cleanup passed.';
+'@
+    Write-Output (Evaluate-Js ('(async () => {' + $assertions + $deletePhase + '})()'))
     $null = Send-Cdp 'Page.navigate' @{url = ([uri]$kioskHtmlPath).AbsoluteUri}
     $kioskReady = $false
     for ($attempt = 0; $attempt -lt 100; $attempt++) {
