@@ -321,7 +321,7 @@ $(document).ready(function () {
 
         function renderRewardSummary() {
             $('#pos-reward-summary').toggleClass('d-none', !activeRewardCode)
-                .text(activeRewardCode ? 'Free coffee reward: ' + activeRewardCode + '. Complete checkout to use this code.' : '');
+                .text(activeRewardCode ? 'Free item reward: ' + activeRewardCode + '. Complete checkout to use this code.' : '');
             $('#amount_paid').prop('readOnly', activeRewardCode !== null);
             if (activeRewardCode) {
                 $('#amount_paid').val('0.00');
@@ -435,7 +435,7 @@ $(document).ready(function () {
             e.preventDefault();
             if (loadingKiosk || checkingOut || deletingKiosk) return;
             if (activeRewardCode) {
-                msgBox('error', 'Complete or clear this free coffee reward before adding other products.');
+                msgBox('error', 'Complete or clear this reward before adding other products.');
                 return;
             }
 
@@ -509,7 +509,7 @@ $(document).ready(function () {
                                     ${formatMoney(item.product_price)} each
                                 </div>
                                 ${item.unavailable ? '<span class="badge badge-warning">Unavailable</span>' : ''}
-                                ${activeRewardCode ? '<span class="badge badge-success">Free coffee reward</span>' : ''}
+                                ${activeRewardCode ? '<span class="badge badge-success">Free item reward</span>' : ''}
                             </div>
 
                             <div class="text-right ml-3">
@@ -626,7 +626,7 @@ $(document).ready(function () {
         function changeQuantity(id, amount) {
             if (checkingOut || deletingKiosk) return;
             if (activeRewardCode && amount > 0) {
-                msgBox('error', 'A reward covers one coffee only.');
+                msgBox('error', 'A reward covers one item only.');
                 return;
             }
             const item = cart.find(
@@ -782,25 +782,25 @@ $(document).ready(function () {
                 }
                 const choices = reward.products.filter(product => product.can_order !== false);
                 if (!choices.length) {
-                    msgBox('error', 'No coffee is currently available for this reward. Please try again later.');
+                    msgBox('error', 'No item is currently available for this reward. Please try again later.');
                     return;
                 }
                 const options = {};
                 choices.forEach(product => { options[String(product.product_id)] = product.product_name; });
                 const selection = await Swal.fire({
-                    title: 'Choose your free coffee',
+                    title: 'Choose your free item',
                     text: 'Reward ' + reward.reward_code + ' for ' + (reward.customer_name || 'loyal customer'),
                     input: 'select',
                     inputOptions: options,
-                    inputPlaceholder: 'Choose a coffee',
+                    inputPlaceholder: 'Choose an item',
                     showCancelButton: true,
-                    confirmButtonText: 'Load free coffee',
-                    inputValidator: value => value ? undefined : 'Choose a coffee to continue.'
+                    confirmButtonText: 'Load free item',
+                    inputValidator: value => value ? undefined : 'Choose an item to continue.'
                 });
                 if (!selection || !selection.isConfirmed) return;
                 const product = choices.find(item => Number(item.product_id) === Number(selection.value));
                 if (!product) {
-                    msgBox('error', 'Choose an available coffee.');
+                    msgBox('error', 'Choose an available item.');
                     return;
                 }
 
@@ -815,7 +815,7 @@ $(document).ready(function () {
                 saveCustomerName();
                 saveCart();
                 renderCart();
-                msgBox('success', 'Reward loaded. Complete checkout to serve one free coffee.');
+                msgBox('success', 'Reward loaded. Complete checkout to serve one free item.');
             } catch (error) {
                 msgBox('error', error && error.responseJSON && error.responseJSON.message
                     || 'Unable to retrieve this reward. Please try again.');

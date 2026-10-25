@@ -54,4 +54,39 @@ class LoyaltyController extends BaseController
             ]);
         }
     }
+
+    public function redeemItem(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->json(['status' => 'error', 'message' => 'Use POST to redeem an item.']);
+            return;
+        }
+
+        try {
+            $userId = $this->customerId();
+            $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($input) || !array_key_exists('product_id', $input)) {
+                throw new \InvalidArgumentException('Choose an item to redeem.');
+            }
+            if (!is_int($input['product_id']) || $input['product_id'] < 1) {
+                throw new \InvalidArgumentException('Choose a valid item to redeem.');
+            }
+            $result = $this->Loyalty->redeemItem($userId, $input['product_id']);
+        } catch (\JsonException $error) {
+            http_response_code(400);
+            $this->json(['status' => 'error', 'message' => 'Send a JSON object with the item to redeem.']);
+            return;
+        } catch (\Throwable $error) {
+            http_response_code(400);
+            $this->json(['status' => 'error', 'message' => $error->getMessage()]);
+            return;
+        }
+
+        $this->json([
+            'status' => 'success',
+            'message' => 'Item redeemed. Show the reward code to the cashier.',
+            'data' => $result
+        ]);
+    }
 }

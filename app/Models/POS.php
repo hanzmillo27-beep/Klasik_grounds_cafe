@@ -189,10 +189,10 @@ class POS extends Model
                 if ($kioskOrderId !== null) throw new \Exception('Use a reward separately from a kiosk order.');
                 $rewardItems = $this->cartQuantities($data['items'] ?? null);
                 if (count($rewardItems) !== 1 || reset($rewardItems) !== 1) {
-                    throw new \Exception('A reward covers exactly one coffee. Choose one item with quantity 1.');
+                    throw new \Exception('A reward covers exactly one item. Choose one item with quantity 1.');
                 }
                 if (Money::paymentCents($data['amount_paid'] ?? null) !== 0) {
-                    throw new \Exception('A free coffee reward requires no payment. Enter 0.00.');
+                    throw new \Exception('A free item reward requires no payment. Enter 0.00.');
                 }
             }
             $fingerprint = $checkoutKey === null ? null : $this->checkoutFingerprint($data, $kioskOrderId, $rewardCode);
@@ -210,13 +210,17 @@ class POS extends Model
             }
 
             if ($rewardCode !== null) {
-                $stmt = $this->db->prepare('SELECT reward_code, used_sale_id, used_at
+                $stmt = $this->db->prepare('SELECT reward_code, used_sale_id, used_at, product_id
                     FROM loyalty_redemptions WHERE reward_code = ?' . $this->lockClause());
                 $stmt->execute([$rewardCode]);
                 $reward = $stmt->fetch();
                 if (!$reward) throw new \Exception('Reward code not found.');
                 if ($reward->used_sale_id !== null || $reward->used_at !== null) {
                     throw new \Exception('This reward code has already been used.');
+                }
+                if ($reward->product_id !== null
+                    && (int) array_key_first($rewardItems) !== (int) $reward->product_id) {
+                    throw new \Exception('Choose the item saved with this reward code.');
                 }
             }
 
@@ -318,7 +322,7 @@ class POS extends Model
                         'A product in this order is unavailable. Please review the order.'
                     );
                 }
-                if ($rewardCode !== null) {
+                if ($rewardCode !== null && $reward->product_id === null) {
                     $stmt = $this->db->prepare('SELECT category_name FROM categories WHERE category_id = ?' . $this->lockClause());
                     $stmt->execute([$product->category_id]);
                     if (!RewardEligibility::isCoffeeCategory($stmt->fetchColumn())) {

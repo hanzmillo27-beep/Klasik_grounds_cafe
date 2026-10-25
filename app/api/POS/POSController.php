@@ -82,8 +82,11 @@ class POSController extends BaseController
             if (!is_string($code)) throw new \InvalidArgumentException('Enter a valid reward code (GC-XXXXXXXX).');
             $reward = (new Loyalty())->reward($code);
             unset($reward['user_id']);
-            $reward['products'] = array_values(array_filter($this->POS->products(), function ($product) {
-                return $product->can_order && RewardEligibility::isCoffeeCategory($product->category_name);
+            $reward['products'] = array_values(array_filter($this->POS->products(), function ($product) use ($reward) {
+                if (!$product->can_order) return false;
+                return isset($reward['product_id'])
+                    ? (int) $product->product_id === $reward['product_id']
+                    : RewardEligibility::isCoffeeCategory($product->category_name);
             }));
         } catch (\Throwable $error) {
             http_response_code(400);
